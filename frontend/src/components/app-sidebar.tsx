@@ -2,10 +2,12 @@ import {
   BarChart3,
   FileText,
   LayoutDashboard,
+  UserSearch,
   Users,
   type LucideIcon,
 } from 'lucide-react'
 import type { ComponentProps } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 
 import {
   Sidebar,
@@ -21,13 +23,15 @@ import {
 } from '@/components/ui/sidebar'
 
 const navMain: { title: string; url: string; icon: LucideIcon }[] = [
-  { title: 'Tableau de bord', url: '#', icon: LayoutDashboard },
+  { title: 'Tableau de bord', url: '/', icon: LayoutDashboard },
+  { title: 'Prospects', url: '/prospects', icon: UserSearch },
   { title: 'Clients', url: '#', icon: Users },
   { title: 'Rapports', url: '#', icon: BarChart3 },
   { title: 'Documents', url: '#', icon: FileText },
 ]
 
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
+  const { pathname } = useLocation()
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -42,17 +46,31 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navMain.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    render={<a href={item.url} />}
-                    tooltip={item.title}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navMain.map((item) => {
+                const isActive =
+                  item.url !== '#' &&
+                  (item.url === '/'
+                    ? pathname === '/'
+                    : pathname.startsWith(item.url))
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      render={
+                        item.url === '#' ? (
+                          <a href={item.url} />
+                        ) : (
+                          <NavLink to={item.url} />
+                        )
+                      }
+                      tooltip={item.title}
+                      isActive={isActive}
+                    >
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
