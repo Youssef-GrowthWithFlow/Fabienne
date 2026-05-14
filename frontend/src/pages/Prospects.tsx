@@ -87,13 +87,9 @@ function ProspectCard({
         </Badge>
       </header>
 
-      {p.segments.length > 0 ? (
+      {p.segment ? (
         <div className="flex flex-wrap items-center gap-2">
-          {p.segments.map((s) => (
-            <Badge key={s} variant="secondary">
-              {s}
-            </Badge>
-          ))}
+          <Badge variant="secondary">{p.segment}</Badge>
         </div>
       ) : null}
 
@@ -135,7 +131,7 @@ function ProspectTableHeaderRow() {
       <TableHead>Nom</TableHead>
       <TableHead>Entreprise</TableHead>
       <TableHead>Rôle</TableHead>
-      <TableHead>Segments</TableHead>
+      <TableHead>Segment</TableHead>
       <TableHead>Dernier commentaire</TableHead>
       <TableHead>Status</TableHead>
     </TableRow>
@@ -181,7 +177,7 @@ export function Prospects() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return prospects.filter((p) => {
-      if (segmentFilter !== 'all' && !p.segments.includes(segmentFilter)) {
+      if (segmentFilter !== 'all' && p.segment !== segmentFilter) {
         return false
       }
       if (statusFilter !== 'all' && p.status !== statusFilter) {
@@ -412,13 +408,9 @@ export function Prospects() {
                     {p.role}
                   </TableCell>
                   <TableCell className="overflow-hidden">
-                    <div className="flex flex-wrap gap-1">
-                      {p.segments.map((s) => (
-                        <Badge key={s} variant="secondary">
-                          {s}
-                        </Badge>
-                      ))}
-                    </div>
+                    {p.segment ? (
+                      <Badge variant="secondary">{p.segment}</Badge>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-normal">
                     {latest ? (

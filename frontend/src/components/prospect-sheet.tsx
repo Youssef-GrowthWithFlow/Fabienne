@@ -1,16 +1,19 @@
 import {
+  CalendarClock,
   Check,
+  CheckCircle2,
   ChevronLeft,
   CircleDot,
   Globe,
+  Handshake,
   Link2,
   Mail,
+  MessageSquare,
   Pencil,
   Phone,
-  Plus,
+  Send,
   Trash2,
   Users,
-  X,
 } from 'lucide-react'
 
 function LinkedinIcon({ className }: { className?: string }) {
@@ -47,6 +50,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
   Tabs,
@@ -59,15 +70,20 @@ import { useProspects } from '@/hooks/use-prospects'
 import { useSegments } from '@/hooks/use-segments'
 import { cn } from '@/lib/utils'
 import {
+  STATUS_RANK,
   STATUSES,
   formatDate,
   newId,
   sortComments,
   statusVariant,
+  todayIso,
   type Comment,
   type Prospect,
   type ProspectStatus,
 } from '@/lib/prospects'
+
+const MESSAGE_CHANNELS = ['LinkedIn', 'Email', 'Téléphone', 'SMS', 'Autre'] as const
+type MessageChannel = (typeof MESSAGE_CHANNELS)[number]
 
 
 type InlineProps = {
@@ -153,46 +169,36 @@ function Row({
 }
 
 
-function SegmentsEditor({
-  values,
+function SegmentSelector({
+  value,
   onChange,
 }: {
-  values: Prospect['segments']
-  onChange: (v: Prospect['segments']) => void
+  value: Prospect['segment']
+  onChange: (v: Prospect['segment']) => void
 }) {
   const { segments, briefs } = useSegments()
-  const remaining = segments.filter((s) => !values.includes(s))
   const label = (id: string) => briefs[id]?.nom ?? id
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-2 py-1">
-      {values.map((v) => (
-        <span
-          key={v}
-          className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-900/30 dark:text-violet-200"
-        >
-          <CircleDot className="size-2.5" />
-          {label(v)}
+      {segments.map((s) => {
+        const active = value === s
+        return (
           <button
+            key={s}
             type="button"
-            onClick={() => onChange(values.filter((x) => x !== v))}
-            className="-mr-0.5 ml-0.5 rounded-full p-0.5 hover:bg-black/10"
-            aria-label={`Retirer ${label(v)}`}
+            onClick={() => onChange(active ? null : s)}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+              active
+                ? 'bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-200'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground border border-dashed',
+            )}
           >
-            <X className="size-2.5" />
+            <CircleDot className="size-2.5" />
+            {label(s)}
           </button>
-        </span>
-      ))}
-      {remaining.map((s) => (
-        <button
-          key={s}
-          type="button"
-          onClick={() => onChange([...values, s])}
-          className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs"
-        >
-          <Plus className="size-2.5" />
-          {label(s)}
-        </button>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -423,6 +429,91 @@ function CommentCard({
 }
 
 
+function MessageSentDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSubmit: (channel: MessageChannel, texte: string) => void
+}) {
+  const [channel, setChannel] = useState<MessageChannel>('LinkedIn')
+  const [texte, setTexte] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setChannel('LinkedIn')
+      setTexte('')
+    }
+  }, [open])
+
+  const canSubmit = texte.trim().length > 0
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Message envoyé</DialogTitle>
+          <DialogDescription>
+            Sur quel canal et quel était le message ?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-muted-foreground text-xs">Canal</span>
+            <div className="flex flex-wrap gap-1.5">
+              {MESSAGE_CHANNELS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setChannel(c)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    channel === c
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-input text-muted-foreground hover:bg-muted',
+                  )}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-muted-foreground text-xs">
+              Description (une ligne)
+            </span>
+            <Input
+              autoFocus
+              value={texte}
+              onChange={(e) => setTexte(e.target.value)}
+              placeholder="Ex. prise de contact, proposition de démo…"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && canSubmit) {
+                  e.preventDefault()
+                  onSubmit(channel, texte.trim())
+                }
+              }}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Annuler
+          </Button>
+          <Button
+            disabled={!canSubmit}
+            onClick={() => onSubmit(channel, texte.trim())}
+          >
+            Enregistrer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function ProspectSheet({
   prospect,
   onClose,
@@ -436,6 +527,7 @@ export function ProspectSheet({
   const [editingFiche, setEditingFiche] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [messageOpen, setMessageOpen] = useState(false)
 
   useEffect(() => {
     setEditingFiche(false)
@@ -532,10 +624,10 @@ export function ProspectSheet({
                 placeholder="Pharmacien titulaire…"
               />
             </Row>
-            <Row icon={CircleDot} label="Segments">
-              <SegmentsEditor
-                values={prospect.segments}
-                onChange={(v) => update('segments', v)}
+            <Row icon={CircleDot} label="Segment">
+              <SegmentSelector
+                value={prospect.segment}
+                onChange={(v) => update('segment', v)}
               />
             </Row>
             <Row icon={CircleDot} label="Statut">
@@ -543,6 +635,18 @@ export function ProspectSheet({
                 <StatusBadge
                   value={prospect.status}
                   onChange={(v) => update('status', v)}
+                />
+              </div>
+            </Row>
+            <Row icon={CalendarClock} label="Relance">
+              <div className="px-2 py-1">
+                <Input
+                  type="date"
+                  value={prospect.relanceDate ?? ''}
+                  onChange={(e) =>
+                    update('relanceDate', e.target.value ? e.target.value : null)
+                  }
+                  className="h-8 w-fit !text-sm"
                 />
               </div>
             </Row>
@@ -624,6 +728,74 @@ export function ProspectSheet({
                 onChange={(v) => update('status', v)}
               />
             </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-muted-foreground text-xs">
+                Enregistrer une action
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMessageOpen(true)}
+                >
+                  <Send className="size-3.5" />
+                  Message envoyé
+                </Button>
+                {(
+                  [
+                    {
+                      icon: MessageSquare,
+                      label: 'Réponse reçue',
+                      status: 'Répondu',
+                    },
+                    {
+                      icon: Handshake,
+                      label: 'RDV pris',
+                      status: 'RDV',
+                    },
+                    {
+                      icon: CheckCircle2,
+                      label: 'Client gagné',
+                      status: 'Client',
+                    },
+                  ] as const
+                ).map((a) => (
+                  <Button
+                    key={a.label}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      addComment(a.label)
+                      const nextRank = STATUS_RANK[a.status]
+                      const curRank = STATUS_RANK[prospect.status]
+                      if (nextRank > curRank) {
+                        onChange({ ...prospect, status: a.status })
+                      }
+                    }}
+                  >
+                    <a.icon className="size-3.5" />
+                    {a.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <CalendarClock className="size-3.5" />
+                Prochaine relance
+              </span>
+              <Input
+                type="date"
+                value={prospect.relanceDate ?? ''}
+                onChange={(e) =>
+                  update('relanceDate', e.target.value ? e.target.value : null)
+                }
+                className="h-8 w-fit !text-sm"
+              />
+            </div>
+
             <CommentComposer onAdd={addComment} />
             {comments.length === 0 ? (
               <p className="text-muted-foreground py-6 text-center text-xs italic">
@@ -712,6 +884,24 @@ export function ProspectSheet({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <MessageSentDialog
+          open={messageOpen}
+          onOpenChange={setMessageOpen}
+          onSubmit={(channel, texte) => {
+            addComment(`Message ${channel} — ${texte}`)
+            const patch: Partial<Prospect> = {}
+            if (STATUS_RANK[prospect.status] < STATUS_RANK['Contacté']) {
+              patch.status = 'Contacté'
+            }
+            if (!prospect.contactedAt) {
+              patch.contactedAt = todayIso()
+            }
+            if (Object.keys(patch).length > 0) {
+              onChange({ ...prospect, ...patch })
+            }
+            setMessageOpen(false)
+          }}
+        />
       </SheetContent>
     </Sheet>
   )

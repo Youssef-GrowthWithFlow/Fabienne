@@ -13,6 +13,7 @@ import {
   FICHE_CLIENT_TEMPLATE,
   initialProspects,
   newId,
+  todayIso,
   type Prospect,
 } from '@/lib/prospects'
 
@@ -51,6 +52,11 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
         if (p.id !== next.id) return p
         if (p === next) return p
         changed = true
+        const isNowContacted =
+          next.status !== 'À contacter' && p.status === 'À contacter'
+        if (isNowContacted && !next.contactedAt) {
+          return { ...next, contactedAt: todayIso() }
+        }
         return next
       })
       return changed ? out : list
@@ -64,7 +70,7 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
       nom: '',
       entreprise: '',
       role: '',
-      segments: [],
+      segment: null,
       telephone: '',
       email: '',
       linkedin: null,
@@ -72,6 +78,9 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
       ficheClient: FICHE_CLIENT_TEMPLATE,
       comments: [],
       status: 'À contacter',
+      createdAt: todayIso(),
+      contactedAt: null,
+      relanceDate: null,
     }
     setProspects((list) => [next, ...list])
     toast.success('Prospect créé')
