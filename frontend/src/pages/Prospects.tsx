@@ -1,20 +1,11 @@
-import {
-  Link2,
-  Mail,
-  Pencil,
-  Phone,
-  Plus,
-  Search,
-  Trash2,
-  X,
-} from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { ProspectSheet } from '@/components/prospect-sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -22,15 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import {
   Pagination,
   PaginationContent,
@@ -49,106 +31,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Textarea } from '@/components/ui/textarea'
 
-type ProspectStatus =
-  | 'À contacter'
-  | 'Contacté'
-  | 'En discussion'
-  | 'Sans réponse'
-  | 'Refus'
-
-const STATUSES: ProspectStatus[] = [
-  'À contacter',
-  'Contacté',
-  'En discussion',
-  'Sans réponse',
-  'Refus',
-]
-
-type Segment = 'Pharmacie' | 'Startup' | 'Collectivité'
-
-const SEGMENTS: Segment[] = ['Pharmacie', 'Startup', 'Collectivité']
-
-type Comment = {
-  id: string
-  date: string // ISO
-  texte: string
-}
-
-type Prospect = {
-  id: string
-  nom: string
-  entreprise: string
-  role: string
-  segments: Segment[]
-  telephone: string
-  email: string
-  linkedin: string | null
-  comments: Comment[]
-  status: ProspectStatus
-}
-
-const initialProspects: Prospect[] = [
-  {
-    id: '1',
-    nom: 'Emilie Genieys',
-    entreprise: 'Pharmacie Genieys',
-    role: 'Pharmacien titulaire',
-    segments: ['Pharmacie'],
-    telephone: '05 61 82 37 64',
-    email: 'pharmacie.gratentour@gmail.com',
-    linkedin: null,
-    comments: [
-      {
-        id: 'c1',
-        date: '2026-05-13',
-        texte: 'Reprise très récente (avril 2026)',
-      },
-    ],
-    status: 'À contacter',
-  },
-]
-
-const statusVariant: Record<
-  ProspectStatus,
-  'default' | 'secondary' | 'outline' | 'destructive'
-> = {
-  'À contacter': 'outline',
-  Contacté: 'secondary',
-  'En discussion': 'default',
-  'Sans réponse': 'outline',
-  Refus: 'destructive',
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
-
-function sortCommentsDesc(list: Comment[]): Comment[] {
-  return [...list].sort((a, b) => (a.date < b.date ? 1 : -1))
-}
-
-function latestComment(list: Comment[]): Comment | undefined {
-  let max: Comment | undefined
-  for (const c of list) {
-    if (!max || c.date > max.date) max = c
-  }
-  return max
-}
-
-function newId(prefix = ''): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `${prefix}${Date.now()}${Math.random().toString(36).slice(2, 8)}`
-}
+import {
+  SEGMENTS,
+  STATUSES,
+  formatDate,
+  isSegmentFilter,
+  isStatusFilter,
+  latestComment,
+  statusVariant,
+  type Prospect,
+  type SegmentFilter,
+  type StatusFilter,
+} from '@/lib/prospects'
+import { useProspects } from '@/hooks/use-prospects'
 
 function buildPageList(current: number, total: number): (number | '…')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
@@ -163,178 +59,6 @@ function buildPageList(current: number, total: number): (number | '…')[] {
 }
 
 const PAGE_SIZE = 10
-
-function PhoneLink({ value }: { value: string }) {
-  if (!value) return <span className="text-muted-foreground">—</span>
-  return (
-    <a
-      href={`tel:${value.replace(/\s/g, '')}`}
-      onClick={(e) => e.stopPropagation()}
-      className="flex min-w-0 items-center gap-1.5 text-sm hover:underline"
-    >
-      <Phone className="size-3.5 shrink-0" />
-      <span className="min-w-0 truncate">{value}</span>
-    </a>
-  )
-}
-
-function EmailLink({ value }: { value: string }) {
-  if (!value) return <span className="text-muted-foreground">—</span>
-  return (
-    <a
-      href={`mailto:${value}`}
-      onClick={(e) => e.stopPropagation()}
-      className="flex min-w-0 items-center gap-1.5 text-sm hover:underline"
-    >
-      <Mail className="size-3.5 shrink-0" />
-      <span className="min-w-0 truncate">{value}</span>
-    </a>
-  )
-}
-
-function LinkedinLink({ value }: { value: string | null }) {
-  if (!value) return <span className="text-muted-foreground">—</span>
-  return (
-    <a
-      href={value}
-      target="_blank"
-      rel="noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className="inline-flex items-center gap-1.5 text-sm hover:underline"
-    >
-      <Link2 className="size-3.5 shrink-0" />
-      Profil
-    </a>
-  )
-}
-
-function CommentEntry({
-  entry,
-  onUpdate,
-  onDelete,
-}: {
-  entry: Comment
-  onUpdate: (id: string, texte: string) => void
-  onDelete: (id: string) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(entry.texte)
-
-  function startEdit() {
-    setDraft(entry.texte)
-    setEditing(true)
-  }
-
-  function commit() {
-    const t = draft.trim()
-    if (!t || t === entry.texte) {
-      setEditing(false)
-      return
-    }
-    onUpdate(entry.id, t)
-    setEditing(false)
-  }
-
-  return (
-    <div className="group bg-muted/40 hover:bg-muted/70 flex items-start gap-3 rounded-md border px-3 py-2 transition-colors">
-      <span className="text-muted-foreground pt-0.5 text-xs font-medium tabular-nums whitespace-nowrap">
-        {formatDate(entry.date)}
-      </span>
-      {editing ? (
-        <Textarea
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setEditing(false)
-              return
-            }
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault()
-              commit()
-            }
-          }}
-          rows={2}
-          className="flex-1 text-sm"
-        />
-      ) : (
-        <p
-          className="flex-1 cursor-text text-sm break-words whitespace-pre-wrap"
-          onClick={startEdit}
-          title="Cliquer pour modifier"
-        >
-          {entry.texte}
-        </p>
-      )}
-      <div className="flex shrink-0 items-center gap-1">
-        {!editing ? (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={startEdit}
-              aria-label="Modifier"
-              title="Modifier"
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onDelete(entry.id)}
-              aria-label="Supprimer"
-              title="Supprimer"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-          </>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-function AddCommentForm({ onAdd }: { onAdd: (texte: string) => void }) {
-  const [draft, setDraft] = useState('')
-  const ref = useRef<HTMLTextAreaElement>(null)
-
-  function submit() {
-    const t = draft.trim()
-    if (!t) return
-    onAdd(t)
-    setDraft('')
-    ref.current?.focus()
-  }
-
-  return (
-    <div className="space-y-2">
-      <Textarea
-        ref={ref}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault()
-            submit()
-          }
-        }}
-        rows={3}
-        placeholder="Ajouter un commentaire… (Cmd/Ctrl+Enter pour envoyer)"
-        className="text-sm"
-      />
-      <div className="flex justify-end">
-        <Button size="sm" onClick={submit} disabled={!draft.trim()}>
-          Ajouter
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 function ProspectCard({
   p,
@@ -354,7 +78,9 @@ function ProspectCard({
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-semibold">{p.nom}</h3>
           <p className="text-muted-foreground truncate text-sm">
-            {p.role} · {p.entreprise}
+            {p.role}
+            {p.role && p.entreprise ? ' · ' : ''}
+            {p.entreprise}
           </p>
         </div>
         <Badge variant={statusVariant[p.status]} className="shrink-0">
@@ -371,27 +97,6 @@ function ProspectCard({
           ))}
         </div>
       ) : null}
-
-      <dl className="grid grid-cols-1 gap-2 text-sm">
-        <div className="min-w-0">
-          <dt className="sr-only">Téléphone</dt>
-          <dd>
-            <PhoneLink value={p.telephone} />
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="sr-only">Email</dt>
-          <dd className="min-w-0">
-            <EmailLink value={p.email} />
-          </dd>
-        </div>
-        <div>
-          <dt className="sr-only">LinkedIn</dt>
-          <dd>
-            <LinkedinLink value={p.linkedin} />
-          </dd>
-        </div>
-      </dl>
 
       {latest ? (
         <div className="text-muted-foreground border-t pt-3 text-sm">
@@ -415,13 +120,10 @@ function ProspectCard({
 function ProspectTableColGroup() {
   return (
     <colgroup>
-      <col className="w-[160px]" />
       <col className="w-[180px]" />
-      <col className="w-[160px]" />
+      <col className="w-[200px]" />
       <col className="w-[180px]" />
-      <col className="w-[140px]" />
-      <col className="w-[220px]" />
-      <col className="w-[110px]" />
+      <col className="w-[200px]" />
       <col />
       <col className="w-[130px]" />
     </colgroup>
@@ -435,9 +137,6 @@ function ProspectTableHeaderRow() {
       <TableHead>Entreprise</TableHead>
       <TableHead>Rôle</TableHead>
       <TableHead>Segments</TableHead>
-      <TableHead>Téléphone</TableHead>
-      <TableHead>Email</TableHead>
-      <TableHead>LinkedIn</TableHead>
       <TableHead>Dernier commentaire</TableHead>
       <TableHead>Status</TableHead>
     </TableRow>
@@ -470,239 +169,22 @@ function ProspectCardSkeleton() {
   )
 }
 
-function ProspectSheet({
-  prospect,
-  onClose,
-  onChange,
-}: {
-  prospect: Prospect
-  onClose: () => void
-  onChange: (next: Prospect) => void
-}) {
-  const update = <K extends keyof Prospect>(key: K, value: Prospect[K]) => {
-    onChange({ ...prospect, [key]: value })
-  }
-
-  const addComment = (texte: string) => {
-    const next: Comment = {
-      id: newId('c'),
-      date: new Date().toISOString(),
-      texte,
-    }
-    update('comments', [next, ...prospect.comments])
-  }
-
-  const updateComment = (id: string, texte: string) => {
-    update(
-      'comments',
-      prospect.comments.map((c) => (c.id === id ? { ...c, texte } : c)),
-    )
-  }
-
-  const deleteComment = (id: string) => {
-    update(
-      'comments',
-      prospect.comments.filter((c) => c.id !== id),
-    )
-  }
-
-  return (
-    <Sheet open onOpenChange={(o) => !o && onClose()}>
-      <SheetContent
-        side="right"
-        className="flex w-full flex-col overflow-y-auto sm:max-w-xl lg:max-w-2xl"
-      >
-        <SheetHeader>
-          <SheetTitle>Modifier le prospect</SheetTitle>
-          <SheetDescription>
-            Les changements sont enregistrés automatiquement.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
-          <div className="grid gap-2">
-            <Label htmlFor="nom">Nom</Label>
-            <Input
-              id="nom"
-              value={prospect.nom}
-              onChange={(e) => update('nom', e.target.value)}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="entreprise">Entreprise</Label>
-            <Input
-              id="entreprise"
-              value={prospect.entreprise}
-              onChange={(e) => update('entreprise', e.target.value)}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="role">Rôle</Label>
-            <Input
-              id="role"
-              value={prospect.role}
-              onChange={(e) => update('role', e.target.value)}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Segments</Label>
-            <div className="flex flex-wrap gap-2">
-              {SEGMENTS.map((s) => {
-                const active = prospect.segments.includes(s)
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() =>
-                      update(
-                        'segments',
-                        active
-                          ? prospect.segments.filter((x) => x !== s)
-                          : [...prospect.segments, s],
-                      )
-                    }
-                    className={
-                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors ' +
-                      (active
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background hover:bg-muted text-muted-foreground')
-                    }
-                  >
-                    {s}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="status">Status</Label>
-            <Select
-              value={prospect.status}
-              onValueChange={(v) => update('status', v as ProspectStatus)}
-            >
-              <SelectTrigger id="status" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="telephone">Téléphone</Label>
-            <Input
-              id="telephone"
-              type="tel"
-              placeholder="06 12 34 56 78"
-              value={prospect.telephone}
-              onChange={(e) => update('telephone', e.target.value)}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="contact@exemple.com"
-              value={prospect.email}
-              onChange={(e) => update('email', e.target.value)}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="linkedin">LinkedIn</Label>
-            <Input
-              id="linkedin"
-              type="url"
-              placeholder="https://linkedin.com/in/…"
-              value={prospect.linkedin ?? ''}
-              onChange={(e) =>
-                update('linkedin', e.target.value ? e.target.value : null)
-              }
-            />
-          </div>
-
-          <div className="border-t pt-4">
-            <h3 className="mb-3 text-sm font-medium">
-              Commentaires{' '}
-              <span className="text-muted-foreground font-normal">
-                ({prospect.comments.length})
-              </span>
-            </h3>
-            <AddCommentForm onAdd={addComment} />
-            {prospect.comments.length > 0 ? (
-              <div className="mt-3 space-y-2">
-                {sortCommentsDesc(prospect.comments).map((entry) => (
-                  <CommentEntry
-                    key={entry.id}
-                    entry={entry}
-                    onUpdate={updateComment}
-                    onDelete={deleteComment}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <SheetFooter className="border-t">
-          <SheetClose render={<Button variant="outline" type="button" />}>
-            Fermer
-          </SheetClose>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-type SegmentFilter = 'all' | Segment
-
-function isSegmentFilter(v: string): v is SegmentFilter {
-  return v === 'all' || (SEGMENTS as readonly string[]).includes(v)
-}
-
 export function Prospects() {
-  const [prospects, setProspects] = useState<Prospect[]>([])
-  const [loading, setLoading] = useState(true)
+  const { prospects, loading, getProspect, updateProspect, createProspect } =
+    useProspects()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setProspects(initialProspects)
-      setLoading(false)
-    }, 700)
-    return () => clearTimeout(t)
-  }, [])
-
-  const segmentCounts = useMemo(() => {
-    const counts: Record<Segment, number> = {
-      Pharmacie: 0,
-      Startup: 0,
-      Collectivité: 0,
-    }
-    for (const p of prospects) {
-      for (const s of p.segments) counts[s]++
-    }
-    return counts
-  }, [prospects])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return prospects.filter((p) => {
       if (segmentFilter !== 'all' && !p.segments.includes(segmentFilter)) {
+        return false
+      }
+      if (statusFilter !== 'all' && p.status !== statusFilter) {
         return false
       }
       if (!q) return true
@@ -715,7 +197,7 @@ export function Prospects() {
         p.comments.some((c) => c.texte.toLowerCase().includes(q))
       )
     })
-  }, [prospects, search, segmentFilter])
+  }, [prospects, search, segmentFilter, statusFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
 
@@ -725,35 +207,17 @@ export function Prospects() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, segmentFilter])
+  }, [search, segmentFilter, statusFilter])
 
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const selected = prospects.find((p) => p.id === selectedId) ?? null
+  const selected = selectedId ? (getProspect(selectedId) ?? null) : null
 
   const openProspect = (id: string) => setSelectedId(id)
   const closeSheet = () => setSelectedId(null)
 
-  const handleChange = (next: Prospect) => {
-    setProspects((list) => list.map((p) => (p.id === next.id ? next : p)))
-  }
-
   const handleCreate = () => {
-    const id = newId('p')
-    const next: Prospect = {
-      id,
-      nom: '',
-      entreprise: '',
-      role: '',
-      segments: [],
-      telephone: '',
-      email: '',
-      linkedin: null,
-      comments: [],
-      status: 'À contacter',
-    }
-    setProspects((list) => [next, ...list])
-    setSelectedId(id)
+    setSelectedId(createProspect())
   }
 
   return (
@@ -770,29 +234,49 @@ export function Prospects() {
         Nouveau prospect
       </Button>
 
-      <div className="sm:hidden">
+      <div className="flex gap-2 sm:hidden">
         <Select
           value={segmentFilter}
           onValueChange={(v) =>
             typeof v === 'string' && isSegmentFilter(v) && setSegmentFilter(v)
           }
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="min-w-0 flex-1">
             <SelectValue>
               {(value: unknown) =>
-                value === 'all' ? 'Tous' : String(value)
+                value === 'all' ? 'Tous les segments' : String(value)
               }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous</SelectItem>
-            {SEGMENTS.map((s) => {
-              return (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              )
-            })}
+            <SelectItem value="all">Tous les segments</SelectItem>
+            {SEGMENTS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) =>
+            typeof v === 'string' && isStatusFilter(v) && setStatusFilter(v)
+          }
+        >
+          <SelectTrigger className="min-w-0 flex-1">
+            <SelectValue>
+              {(value: unknown) =>
+                value === 'all' ? 'Tous les statuts' : String(value)
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -803,32 +287,16 @@ export function Prospects() {
         className="hidden sm:flex"
       >
         <TabsList>
-          <TabsTrigger value="all">
-            Tous
-            <Badge variant="secondary" className="ml-1.5">
-              {loading ? (
-                <Skeleton className="h-3 w-4" />
-              ) : (
-                prospects.length
-              )}
-            </Badge>
-          </TabsTrigger>
+          <TabsTrigger value="all">Tous</TabsTrigger>
           {SEGMENTS.map((s) => (
             <TabsTrigger key={s} value={s}>
               {s}
-              <Badge variant="secondary" className="ml-1.5">
-                {loading ? (
-                  <Skeleton className="h-3 w-4" />
-                ) : (
-                  segmentCounts[s]
-                )}
-              </Badge>
             </TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
 
-      <div className="bg-card flex flex-wrap items-center gap-2 rounded-xl border p-3">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
           <Input
@@ -839,19 +307,49 @@ export function Prospects() {
             className="pl-8"
           />
         </div>
-        {search ? (
-          <Button variant="ghost" size="sm" onClick={() => setSearch('')}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) =>
+            typeof v === 'string' && isStatusFilter(v) && setStatusFilter(v)
+          }
+        >
+          <SelectTrigger className="hidden w-44 sm:flex">
+            <SelectValue>
+              {(value: unknown) =>
+                value === 'all' ? 'Tous les statuts' : String(value)
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {search || statusFilter !== 'all' ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearch('')
+              setStatusFilter('all')
+            }}
+          >
             <X className="mr-1 size-4" /> Réinitialiser
           </Button>
         ) : null}
-        <span className="text-muted-foreground ml-auto text-xs">
-          {loading ? (
-            <Skeleton className="inline-block h-3 w-20" />
-          ) : (
-            `${filtered.length} résultat${filtered.length > 1 ? 's' : ''}`
-          )}
-        </span>
       </div>
+
+      <p className="text-muted-foreground text-xs tabular-nums">
+        {loading ? (
+          <Skeleton className="inline-block h-3 w-20" />
+        ) : (
+          `${filtered.length} prospect${filtered.length > 1 ? 's' : ''}`
+        )}
+      </p>
 
       {!loading && filtered.length === 0 ? (
         <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
@@ -889,7 +387,7 @@ export function Prospects() {
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 9 }).map((__, j) => (
+                    {Array.from({ length: 6 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -919,15 +417,6 @@ export function Prospects() {
                         </Badge>
                       ))}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <PhoneLink value={p.telephone} />
-                  </TableCell>
-                  <TableCell>
-                    <EmailLink value={p.email} />
-                  </TableCell>
-                  <TableCell>
-                    <LinkedinLink value={p.linkedin} />
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-normal">
                     {latest ? (
@@ -1010,7 +499,7 @@ export function Prospects() {
         <ProspectSheet
           prospect={selected}
           onClose={closeSheet}
-          onChange={handleChange}
+          onChange={updateProspect}
         />
       ) : null}
     </>
