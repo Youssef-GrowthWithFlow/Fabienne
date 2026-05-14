@@ -33,10 +33,8 @@ import {
 } from '@/components/ui/table'
 
 import {
-  SEGMENTS,
   STATUSES,
   formatDate,
-  isSegmentFilter,
   isStatusFilter,
   latestComment,
   statusVariant,
@@ -45,6 +43,7 @@ import {
   type StatusFilter,
 } from '@/lib/prospects'
 import { useProspects } from '@/hooks/use-prospects'
+import { useSegments } from '@/hooks/use-segments'
 
 function buildPageList(current: number, total: number): (number | '…')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
@@ -172,6 +171,7 @@ function ProspectCardSkeleton() {
 export function Prospects() {
   const { prospects, loading, getProspect, updateProspect, createProspect } =
     useProspects()
+  const { segments, briefs: segmentBriefs } = useSegments()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all')
@@ -238,21 +238,23 @@ export function Prospects() {
         <Select
           value={segmentFilter}
           onValueChange={(v) =>
-            typeof v === 'string' && isSegmentFilter(v) && setSegmentFilter(v)
+            typeof v === 'string' && setSegmentFilter(v)
           }
         >
           <SelectTrigger className="min-w-0 flex-1">
             <SelectValue>
               {(value: unknown) =>
-                value === 'all' ? 'Tous les segments' : String(value)
+                value === 'all'
+                  ? 'Tous les segments'
+                  : segmentBriefs[String(value)]?.nom ?? String(value)
               }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les segments</SelectItem>
-            {SEGMENTS.map((s) => (
+            {segments.map((s) => (
               <SelectItem key={s} value={s}>
-                {s}
+                {segmentBriefs[s]?.nom ?? s}
               </SelectItem>
             ))}
           </SelectContent>
@@ -283,14 +285,14 @@ export function Prospects() {
 
       <Tabs
         value={segmentFilter}
-        onValueChange={(v) => isSegmentFilter(v) && setSegmentFilter(v)}
+        onValueChange={setSegmentFilter}
         className="hidden sm:flex"
       >
         <TabsList>
           <TabsTrigger value="all">Tous</TabsTrigger>
-          {SEGMENTS.map((s) => (
+          {segments.map((s) => (
             <TabsTrigger key={s} value={s}>
-              {s}
+              {segmentBriefs[s]?.nom ?? s}
             </TabsTrigger>
           ))}
         </TabsList>

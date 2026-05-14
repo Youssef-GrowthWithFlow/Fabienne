@@ -1,9 +1,7 @@
 import {
-  BarChart3,
-  FileText,
   LayoutDashboard,
+  Layers,
   UserSearch,
-  Users,
   type LucideIcon,
 } from 'lucide-react'
 import type { ComponentProps } from 'react'
@@ -25,9 +23,7 @@ import {
 const navMain: { title: string; url: string; icon: LucideIcon }[] = [
   { title: 'Tableau de bord', url: '/', icon: LayoutDashboard },
   { title: 'Prospects', url: '/prospects', icon: UserSearch },
-  { title: 'Clients', url: '#', icon: Users },
-  { title: 'Rapports', url: '#', icon: BarChart3 },
-  { title: 'Documents', url: '#', icon: FileText },
+  { title: 'Segments', url: '/segments', icon: Layers },
 ]
 
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {

@@ -24,13 +24,13 @@ export const statusVariant: Record<
   Refus: 'destructive',
 }
 
-export type Segment = 'Pharmacie' | 'Startup' | 'Collectivité'
-export const SEGMENTS: Segment[] = ['Pharmacie', 'Startup', 'Collectivité']
+export type Segment = string
+export const INITIAL_SEGMENT_IDS: Segment[] = [
+  'Pharmacie',
+  'Startup',
+  'Collectivité',
+]
 export type SegmentFilter = 'all' | Segment
-
-export function isSegmentFilter(v: string): v is SegmentFilter {
-  return v === 'all' || (SEGMENTS as readonly string[]).includes(v)
-}
 
 export type StatusFilter = 'all' | ProspectStatus
 

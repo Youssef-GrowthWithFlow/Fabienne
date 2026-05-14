@@ -56,9 +56,9 @@ import {
 } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { useProspects } from '@/hooks/use-prospects'
+import { useSegments } from '@/hooks/use-segments'
 import { cn } from '@/lib/utils'
 import {
-  SEGMENTS,
   STATUSES,
   formatDate,
   newId,
@@ -160,7 +160,9 @@ function SegmentsEditor({
   values: Prospect['segments']
   onChange: (v: Prospect['segments']) => void
 }) {
-  const remaining = SEGMENTS.filter((s) => !values.includes(s))
+  const { segments, briefs } = useSegments()
+  const remaining = segments.filter((s) => !values.includes(s))
+  const label = (id: string) => briefs[id]?.nom ?? id
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-2 py-1">
       {values.map((v) => (
@@ -169,12 +171,12 @@ function SegmentsEditor({
           className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-900/30 dark:text-violet-200"
         >
           <CircleDot className="size-2.5" />
-          {v}
+          {label(v)}
           <button
             type="button"
             onClick={() => onChange(values.filter((x) => x !== v))}
             className="-mr-0.5 ml-0.5 rounded-full p-0.5 hover:bg-black/10"
-            aria-label={`Retirer ${v}`}
+            aria-label={`Retirer ${label(v)}`}
           >
             <X className="size-2.5" />
           </button>
@@ -188,7 +190,7 @@ function SegmentsEditor({
           className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs"
         >
           <Plus className="size-2.5" />
-          {s}
+          {label(s)}
         </button>
       ))}
     </div>
