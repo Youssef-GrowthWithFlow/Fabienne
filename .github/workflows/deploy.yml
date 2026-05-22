@@ -1,3 +1,4 @@
+# develop → preprod, main → prod (via SSH to the Hostinger VPS).
 name: Deploy
 
 on:
