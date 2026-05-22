@@ -1,0 +1,553 @@
+import { Check, ChevronLeft, Pencil, Trash2 } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RichTextEditor } from '@/components/rich-text-editor'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TagsField } from '@/components/tags-field'
+import { Textarea } from '@/components/ui/textarea'
+import { useSegments } from '@/hooks/use-segments'
+import { cn } from '@/lib/utils'
+import type { Segment } from '@/lib/prospects'
+import {
+  DATA_SOURCE_OPTIONS,
+  type AISource,
+  type SegmentBrief,
+} from '@/lib/segments'
+
+type InlineTextProps = {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  multiline?: boolean
+  className?: string
+  displayClassName?: string
+}
+
+function InlineText({
+  value,
+  onChange,
+  placeholder,
+  multiline = false,
+  className,
+  displayClassName,
+}: InlineTextProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+
+  function commit() {
+    if (draft !== value) onChange(draft)
+    setEditing(false)
+  }
+
+  if (editing) {
+    if (multiline) {
+      return (
+        <Textarea
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          rows={3}
+          className={cn('resize-y text-sm', className)}
+          placeholder={placeholder}
+        />
+      )
+    }
+    return (
+      <Input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+          else if (e.key === 'Escape') setEditing(false)
+        }}
+        className={cn('h-8 !text-sm', className)}
+        placeholder={placeholder}
+      />
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(value)
+        setEditing(true)
+      }}
+      className={cn(
+        'rounded-sm text-left text-sm hover:bg-muted/60',
+        !value && 'italic text-muted-foreground',
+        displayClassName,
+      )}
+    >
+      {value || placeholder || 'Ajouter…'}
+    </button>
+  )
+}
+
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
+      {children}
+    </div>
+  )
+}
+
+function NotesSection({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (html: string) => void
+  placeholder: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const isEmpty = !value.replace(/<[^>]*>/g, '').trim()
+  const effectiveEditing = editing || isEmpty
+  return (
+    <section className="flex flex-col gap-3 border-t pt-5">
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-semibold">Notes libres</h3>
+        {isEmpty ? null : effectiveEditing ? (
+          <Button
+            size="sm"
+            onClick={() => setEditing(false)}
+            className="ml-auto h-7 text-[0.8rem]"
+          >
+            <Check className="size-3.5" />
+            Terminé
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditing(true)}
+            className="ml-auto h-7 text-[0.8rem]"
+          >
+            <Pencil className="size-3.5" />
+            Modifier
+          </Button>
+        )}
+      </div>
+      <RichTextEditor
+        value={value}
+        onChange={onChange}
+        editable={effectiveEditing}
+        placeholder={placeholder}
+      />
+    </section>
+  )
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="flex flex-col gap-4 border-t pt-5 first:border-t-0 first:pt-0">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="flex flex-col gap-4">{children}</div>
+    </section>
+  )
+}
+
+function AISourcesField({
+  values,
+  onChange,
+}: {
+  values: AISource[]
+  onChange: (next: AISource[]) => void
+}) {
+  function update(index: number, patch: Partial<AISource>) {
+    onChange(values.map((v, i) => (i === index ? { ...v, ...patch } : v)))
+  }
+  function remove(index: number) {
+    onChange(values.filter((_, i) => i !== index))
+  }
+  function add() {
+    onChange([...values, { url: '', description: '' }])
+  }
+  function pruneEmptyOnBlur() {
+    const cleaned = values.filter(
+      (v) => v.url.trim().length > 0 || v.description.trim().length > 0,
+    )
+    if (cleaned.length !== values.length) onChange(cleaned)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {values.map((src, i) => (
+        <div key={i} className="flex items-start gap-2">
+          <Input
+            value={src.url}
+            placeholder="https://…"
+            onChange={(e) => update(i, { url: e.target.value })}
+            onBlur={pruneEmptyOnBlur}
+            className="flex-1"
+          />
+          <Input
+            value={src.description}
+            placeholder="Annuaire officiel, registre…"
+            onChange={(e) => update(i, { description: e.target.value })}
+            onBlur={pruneEmptyOnBlur}
+            className="flex-1"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => remove(i)}
+            aria-label="Retirer cette source"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        onClick={add}
+      >
+        + Ajouter une source
+      </Button>
+    </div>
+  )
+}
+
+
+function DataSourcesField({
+  values,
+  onChange,
+}: {
+  values: string[]
+  onChange: (next: string[]) => void
+}) {
+  function toggle(value: string, checked: boolean) {
+    if (checked) {
+      if (values.includes(value)) return
+      onChange([...values, value])
+    } else {
+      onChange(values.filter((v) => v !== value))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {DATA_SOURCE_OPTIONS.map((opt) => {
+        const checked = values.includes(opt.value)
+        return (
+          <label
+            key={opt.value}
+            className="flex cursor-pointer items-start gap-3 rounded-md border bg-card p-3 hover:bg-muted/40"
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(e) => toggle(opt.value, e.target.checked)}
+              className="mt-0.5 size-4 cursor-pointer accent-foreground"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">{opt.label}</div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {opt.description}
+              </p>
+            </div>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
+type Props = {
+  segment: Segment | null
+  onClose: () => void
+}
+
+export function SegmentSheet({ segment, onClose }: Props) {
+  const { getBrief, updateBrief, deleteSegment } = useSegments()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  if (!segment) return null
+
+  const brief = getBrief(segment)
+
+  function set<K extends keyof SegmentBrief>(key: K, value: SegmentBrief[K]) {
+    if (!segment) return
+    updateBrief(segment, { ...brief, [key]: value })
+  }
+
+  function confirmDelete() {
+    if (!segment) return
+    setConfirmOpen(false)
+    deleteSegment(segment)
+    onClose()
+  }
+
+  return (
+    <Sheet
+      open
+      modal={false}
+      onOpenChange={(o, details) => {
+        if (o) return
+        if (
+          details?.reason === 'close-press' ||
+          details?.reason === 'escape-key'
+        ) {
+          onClose()
+        }
+      }}
+    >
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="flex !w-full flex-col gap-0 p-0 sm:!max-w-none lg:!w-[60vw]"
+      >
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2 py-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="gap-1.5"
+          >
+            <ChevronLeft className="size-4" />
+            Retour
+          </Button>
+          <span className="truncate px-2 text-sm font-medium text-muted-foreground">
+            {brief.nom || segment}
+          </span>
+        </div>
+
+        <Tabs
+          defaultValue="cible"
+          className="flex min-h-0 flex-1 flex-col gap-0"
+        >
+          <div className="border-b px-6 sm:px-10 pt-3 pb-2">
+            <TabsList>
+              <TabsTrigger value="cible">Cible</TabsTrigger>
+              <TabsTrigger value="offre">Offre</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent
+            value="cible"
+            className="min-h-0 flex-1 overflow-y-auto px-6 sm:px-10 py-6"
+          >
+            <div className="flex flex-col gap-6">
+              <Section title="Identité">
+                <Row label="Nom">
+                  <InlineText
+                    value={brief.nom}
+                    onChange={(v) => set('nom', v)}
+                    placeholder={segment}
+                  />
+                </Row>
+                <Row label="Description">
+                  <InlineText
+                    value={brief.description}
+                    onChange={(v) => set('description', v)}
+                    placeholder="Ajouter une description"
+                    multiline
+                  />
+                </Row>
+              </Section>
+
+              <Section title="À qui on parle">
+                <Row label="Intitulé de poste">
+                  <TagsField
+                    values={brief.postes}
+                    onChange={(v) => set('postes', v)}
+                    placeholder="Ex : Pharmacien titulaire"
+                  />
+                </Row>
+                <Row label="Taille">
+                  <InlineText
+                    value={brief.tailleStructure}
+                    onChange={(v) => set('tailleStructure', v)}
+                    placeholder="Ex : 2 à 5 salariés"
+                  />
+                </Row>
+                <Row label="Activité ciblée">
+                  <TagsField
+                    values={brief.activiteCiblee}
+                    onChange={(v) => set('activiteCiblee', v)}
+                    placeholder="Ex : Officine indépendante"
+                  />
+                </Row>
+                <Row label="Zone géographique">
+                  <TagsField
+                    values={brief.zoneGeographique}
+                    onChange={(v) => set('zoneGeographique', v)}
+                    placeholder="Ex : Agglomération toulousaine"
+                  />
+                </Row>
+              </Section>
+
+              <Section title="Ce qui leur pose problème">
+                <Row label="Problèmes">
+                  <TagsField
+                    values={brief.painPoints}
+                    onChange={(v) => set('painPoints', v)}
+                  />
+                </Row>
+              </Section>
+
+              <Section title="Signaux">
+                <Row label="Must have">
+                  <TagsField
+                    values={brief.mustHave}
+                    onChange={(v) => set('mustHave', v)}
+                    placeholder="Ex : Vient de prendre son poste"
+                  />
+                </Row>
+                <Row label="Should have">
+                  <TagsField
+                    values={brief.shouldHave}
+                    onChange={(v) => set('shouldHave', v)}
+                  />
+                </Row>
+                <Row label="Red flag">
+                  <TagsField
+                    values={brief.redFlags}
+                    onChange={(v) => set('redFlags', v)}
+                  />
+                </Row>
+              </Section>
+
+              <Section title="Pistes pour chercher">
+                <Row label="Sources utiles">
+                  <TagsField
+                    values={brief.sources}
+                    onChange={(v) => set('sources', v)}
+                    placeholder="Ex : LinkedIn Sales Navigator"
+                  />
+                </Row>
+              </Section>
+
+              <Section title="Sources web pour l'IA">
+                <p className="text-xs text-muted-foreground">
+                  URL + description. L'IA peut s'en servir lors du sourcing
+                  (à sa discrétion).
+                </p>
+                <AISourcesField
+                  values={brief.aiSources}
+                  onChange={(v) => set('aiSources', v)}
+                />
+              </Section>
+
+              <Section title="Bases de données externes">
+                <DataSourcesField
+                  values={brief.dataSources}
+                  onChange={(v) => set('dataSources', v)}
+                />
+              </Section>
+            </div>
+          </TabsContent>
+
+          <TabsContent
+            value="offre"
+            className="min-h-0 flex-1 overflow-y-auto px-6 sm:px-10 py-6"
+          >
+            <div className="flex flex-col gap-6">
+              <Section title="Notre promesse">
+                <Row label="En une phrase">
+                  <InlineText
+                    value={brief.pitch}
+                    onChange={(v) => set('pitch', v)}
+                    placeholder="Ce qu’on leur apporte, sans jargon"
+                    multiline
+                  />
+                </Row>
+              </Section>
+
+              <Section title="Pourquoi ça marche">
+                <Row label="Bénéfices">
+                  <TagsField
+                    values={brief.benefices}
+                    onChange={(v) => set('benefices', v)}
+                    placeholder="Un bénéfice concret"
+                  />
+                </Row>
+                <Row label="Preuves">
+                  <TagsField
+                    values={brief.preuves}
+                    onChange={(v) => set('preuves', v)}
+                    placeholder="Chiffre, cas client, logo"
+                  />
+                </Row>
+              </Section>
+
+              <NotesSection
+                value={brief.notes}
+                onChange={(html) => set('notes', html)}
+                placeholder="Écris tout ce qui peut décrire ton offre…"
+              />
+            </div>
+          </TabsContent>
+
+        </Tabs>
+
+        <div className="flex shrink-0 flex-col gap-2 border-t px-6 sm:px-10 py-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmOpen(true)}
+            className="text-muted-foreground hover:text-destructive w-full justify-center"
+          >
+            <Trash2 className="size-4" />
+            Supprimer le segment
+          </Button>
+        </div>
+
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Supprimer {brief.nom || 'ce segment'}&nbsp;?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={confirmDelete}>
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </SheetContent>
+    </Sheet>
+  )
+}

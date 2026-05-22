@@ -1,121 +1,112 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { Loader2 } from 'lucide-react'
+import { Route, Routes, useLocation } from 'react-router-dom'
+
+import { AppSidebar } from '@/components/app-sidebar'
+import { Separator } from '@/components/ui/separator'
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ActionsProvider } from '@/hooks/use-actions'
+import { AuthProvider, useAuth } from '@/hooks/use-auth'
+import { EntreprisesProvider } from '@/hooks/use-entreprises'
+import { ProspectsProvider } from '@/hooks/use-prospects'
+import { SegmentsProvider } from '@/hooks/use-segments'
+import { SourcerProvider } from '@/hooks/use-sourcer-history'
+import { AdminUsers } from '@/pages/AdminUsers'
+import { Dashboard } from '@/pages/Dashboard'
+import { Entreprises } from '@/pages/Entreprises'
+import { ForgotPassword } from '@/pages/ForgotPassword'
+import { Login } from '@/pages/Login'
+import { Prospects } from '@/pages/Prospects'
+import { ResetPassword } from '@/pages/ResetPassword'
+import { Segments } from '@/pages/Segments'
+import { Sourcer } from '@/pages/Sourcer'
+
+function pageTitleFor(pathname: string): string {
+  if (pathname === '/') return 'Tableau de bord'
+  if (pathname.startsWith('/prospects')) return 'Prospects'
+  if (pathname.startsWith('/entreprises')) return 'Entreprises'
+  if (pathname.startsWith('/sourcer')) return 'Sourcer'
+  if (pathname.startsWith('/segments')) return 'Segments'
+  if (pathname.startsWith('/admin/users')) return 'Utilisateurs'
+  return 'Tableau de bord'
+}
 
 function App() {
-  const [count, setCount] = useState(0)
+  // Password-reset / forgot-password pages are reachable without auth.
+  const { pathname } = useLocation()
+  if (pathname === '/reset-password') return <ResetPassword />
+  if (pathname === '/forgot-password') return <ForgotPassword />
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <AuthProvider>
+      <AuthedApp />
+    </AuthProvider>
+  )
+}
 
-      <div className="ticks"></div>
+function AuthedApp() {
+  const { status } = useAuth()
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+  if (status === 'initializing') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/20">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+  if (status === 'anonymous') {
+    return <Login />
+  }
+
+  return <AppShell />
+}
+
+function AppShell() {
+  const { pathname } = useLocation()
+
+  return (
+    <ActionsProvider>
+      <SegmentsProvider>
+        <EntreprisesProvider>
+          <ProspectsProvider>
+            <SourcerProvider>
+              <TooltipProvider>
+                <SidebarProvider>
+                  <AppSidebar />
+                  <SidebarInset className="min-w-0 overflow-x-hidden">
+                    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+                      <SidebarTrigger className="-ml-1" />
+                      <Separator
+                        orientation="vertical"
+                        className="mr-2 data-[orientation=vertical]:h-4"
+                      />
+                      <h1 className="text-base font-medium">
+                        {pageTitleFor(pathname)}
+                      </h1>
+                    </header>
+                    <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 sm:p-6">
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/prospects" element={<Prospects />} />
+                        <Route path="/entreprises" element={<Entreprises />} />
+                        <Route path="/sourcer" element={<Sourcer />} />
+                        <Route path="/segments" element={<Segments />} />
+                        <Route path="/admin/users" element={<AdminUsers />} />
+                      </Routes>
+                    </div>
+                  </SidebarInset>
+                </SidebarProvider>
+              </TooltipProvider>
+            </SourcerProvider>
+          </ProspectsProvider>
+        </EntreprisesProvider>
+      </SegmentsProvider>
+    </ActionsProvider>
   )
 }
 
