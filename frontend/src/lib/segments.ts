@@ -23,13 +23,25 @@ export type SegmentBrief = {
   aiSources: AISource[]
 }
 
+// Zone par défaut : Haute-Garonne + départements limitrophes (Toulouse-centric).
+// Fabienne prospecte localement par défaut ; on peut toujours éditer la liste.
+export const DEFAULT_ZONE_GEOGRAPHIQUE: string[] = [
+  'Haute-Garonne (31)',
+  'Tarn (81)',
+  'Tarn-et-Garonne (82)',
+  'Gers (32)',
+  'Hautes-Pyrénées (65)',
+  'Ariège (09)',
+  'Aude (11)',
+]
+
 export const EMPTY_SEGMENT_BRIEF: SegmentBrief = {
   nom: '',
   description: '',
   postes: [],
   tailleStructure: '',
   activiteCiblee: [],
-  zoneGeographique: [],
+  zoneGeographique: [...DEFAULT_ZONE_GEOGRAPHIQUE],
   painPoints: [],
   mustHave: [],
   shouldHave: [],

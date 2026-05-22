@@ -39,23 +39,22 @@ export function ForgotPassword() {
           <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10">
             <Mail className="size-5 text-primary" />
           </div>
-          <CardTitle className="text-xl">Mot de passe oublié</CardTitle>
+          <CardTitle className="text-xl">Ça arrive à tout le monde</CardTitle>
           <CardDescription>
-            Renseigne ton email, on t'envoie un lien de réinitialisation.
+            Mets ton email, je t'envoie un lien pour repartir.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {sent ? (
             <div className="flex flex-col gap-3 text-sm">
               <p className="text-foreground">
-                Si un compte existe avec cet email, un lien de réinitialisation
-                a été envoyé.
+                C’est parti — regarde ta boîte mail dans la minute qui vient.
               </p>
               <a
                 href="/"
                 className="self-center text-xs text-muted-foreground hover:text-foreground hover:underline"
               >
-                Retour à la connexion
+                Retour
               </a>
             </div>
           ) : (
@@ -79,13 +78,13 @@ export function ForgotPassword() {
                 disabled={submitting || !email}
               >
                 {submitting && <Loader2 className="size-4 animate-spin" />}
-                Envoyer le lien
+                M'envoyer le lien
               </Button>
               <a
                 href="/"
                 className="self-center text-xs text-muted-foreground hover:text-foreground hover:underline"
               >
-                Retour à la connexion
+                Retour
               </a>
             </form>
           )}

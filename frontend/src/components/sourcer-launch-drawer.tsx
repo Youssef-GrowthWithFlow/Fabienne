@@ -30,12 +30,14 @@ type Step = 1 | 2
 
 const STEP_META: Record<Step, { title: string; description: string }> = {
   1: {
-    title: 'Lancer un sourcing',
-    description: 'Segment et nombre de leads à générer.',
+    title: 'Trouver de nouveaux leads',
+    description:
+      'Choisis le segment et combien tu en veux. Compte 1 à 2 minutes : je fouille pour de vrai.',
   },
   2: {
-    title: 'Critères de recherche',
-    description: 'Affine la recherche pour cette session.',
+    title: 'Tes critères',
+    description:
+      'Affine la recherche pour cette session. Une fois lancé, ça prend 1 à 2 minutes.',
   },
 }
 
@@ -192,7 +194,7 @@ export function SourcerLaunchDrawer({ open, onOpenChange }: Props) {
                 ) : (
                   <Sparkles className="size-3.5" />
                 )}
-                Lancer
+                {generating ? 'En cours… (1-2 min)' : 'C’est parti'}
               </Button>
             )}
           </DrawerFooter>

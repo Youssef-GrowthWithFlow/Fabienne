@@ -57,8 +57,8 @@ export function ResetPassword() {
           <CardTitle className="text-xl">Nouveau mot de passe</CardTitle>
           <CardDescription>
             {done
-              ? 'Mot de passe mis à jour. Tu peux te reconnecter.'
-              : 'Choisis un nouveau mot de passe (8 caractères minimum).'}
+              ? 'C’est bon, tu peux te reconnecter.'
+              : 'Choisis-en un solide (8 caractères mini).'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -70,7 +70,7 @@ export function ResetPassword() {
                 href="/"
                 className="text-sm font-medium text-primary hover:underline"
               >
-                Aller à la connexion →
+                Me reconnecter →
               </a>
             </div>
           ) : (
@@ -121,7 +121,7 @@ export function ResetPassword() {
                 disabled={!canSubmit || submitting}
               >
                 {submitting && <Loader2 className="size-4 animate-spin" />}
-                Mettre à jour
+                Enregistrer
               </Button>
             </form>
           )}

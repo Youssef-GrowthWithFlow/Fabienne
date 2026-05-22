@@ -23,9 +23,9 @@ export function Segments() {
   return (
     <>
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Segments</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Tes segments</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Définissez l’ICP et le playbook de prospection de chaque segment.
+          À qui tu parles, et comment. Une fiche par type de client à viser.
         </p>
       </div>
 

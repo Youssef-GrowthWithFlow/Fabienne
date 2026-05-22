@@ -18,10 +18,10 @@ export function SourcingProgress({ phases, recovering }: Props) {
   const last = phases[phases.length - 1]
   if (last?.phase === 'done') return null
 
-  const liveMessage = last?.message ?? 'Recherche IA en lancement…'
+  const liveMessage = last?.message ?? 'Je commence à chercher…'
   const headline = recovering
-    ? 'Sourcing en cours en arrière-plan'
-    : 'Sourcing en cours'
+    ? 'Je continue à chercher en fond'
+    : 'Je cherche pour toi'
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/[0.04] px-4 py-3 text-sm">
@@ -30,8 +30,8 @@ export function SourcingProgress({ phases, recovering }: Props) {
         <div className="font-medium text-foreground">{headline}</div>
         <div className="mt-0.5 text-[12px] text-muted-foreground">
           {recovering
-            ? "Tu peux quitter cette page, les leads apparaîtront ici dès qu'ils sont prêts."
-            : `${liveMessage} — typiquement 20-30 s. Tu peux fermer l'onglet, le sourcing continue côté serveur et les leads remonteront automatiquement.`}
+            ? 'Tu peux fermer l’onglet, je te montre les leads dès qu’ils arrivent.'
+            : `${liveMessage} — compte 1 à 2 minutes. Tu peux fermer l’onglet, je continue et les leads apparaîtront ici.`}
         </div>
       </div>
     </div>

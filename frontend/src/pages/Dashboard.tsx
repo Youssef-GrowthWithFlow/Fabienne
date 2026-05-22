@@ -1035,10 +1035,10 @@ export function Dashboard() {
     <>
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">
-          Tableau de bord
+          Ta semaine
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Objectifs, relances, pipeline et suivi de l'activité.
+          Tes objectifs, tes relances et ce qui bouge dans ton pipeline.
         </p>
       </div>
 

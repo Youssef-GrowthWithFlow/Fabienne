@@ -232,9 +232,9 @@ export function Prospects() {
   return (
     <>
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Prospects</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Tes prospects</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Liste des prospects qualifiés et suivi des échanges.
+          Toutes les personnes que tu suis, et où vous en êtes.
         </p>
       </div>
 

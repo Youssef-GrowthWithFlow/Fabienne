@@ -131,12 +131,12 @@ export function Sourcer() {
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <Telescope className="size-5 text-primary" />
-            Sourcer
+            Trouver de nouveaux leads
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {counts.pending > 0
-              ? `${counts.pending} lead${counts.pending > 1 ? 's' : ''} à valider.`
-              : 'Lance une recherche IA pour générer de nouveaux leads.'}
+              ? `${counts.pending} lead${counts.pending > 1 ? 's' : ''} à regarder — à toi de jouer.`
+              : 'Lance une recherche, je m’occupe de trouver les bons profils.'}
           </p>
         </div>
         <Button

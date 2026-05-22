@@ -110,11 +110,12 @@ export function Entreprises() {
       <div>
         <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Building2 className="size-5 text-primary" />
-          Entreprises
+          Tes entreprises
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {entreprises.length} entreprise{entreprises.length > 1 ? 's' : ''} en
-          base.
+          {entreprises.length === 0
+            ? 'Aucune entreprise pour l’instant — ajoutes-en une pour démarrer.'
+            : `${entreprises.length} entreprise${entreprises.length > 1 ? 's' : ''} dans ton carnet.`}
         </p>
       </div>
 

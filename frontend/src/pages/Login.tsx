@@ -40,30 +40,27 @@ export function Login() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/20 px-4 py-10">
       <div className="flex w-full max-w-sm flex-col items-center gap-5">
-        {/* Hero illustration --------------------------------------------- */}
         <img
           src={penguinHero}
-          alt="Prospection Automatisée — Growth With Flow"
+          alt=""
           width={220}
           height={152}
           className="h-auto w-44 select-none sm:w-52"
           draggable={false}
         />
 
-        {/* Wordmark + tagline ------------------------------------------- */}
         <div className="flex flex-col items-center gap-1 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">
-            Prospection Automatisée
+            Re-bonjour Fabienne 👋
           </h1>
           <p className="text-sm text-muted-foreground">
-            On trouve vos prochains clients pendant que vous faites le reste.
+            On reprend là où on s'était arrêtées ?
           </p>
         </div>
 
-        {/* Login card ---------------------------------------------------- */}
         <Card className="w-full">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Connexion</CardTitle>
+            <CardTitle className="text-base">Se connecter</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -77,7 +74,7 @@ export function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="prenom@growthwithflow.com"
+                  placeholder="fabienne@..."
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -87,7 +84,7 @@ export function Login() {
                     href="/forgot-password"
                     className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
                   >
-                    Oublié ?
+                    J'ai oublié
                   </a>
                 </div>
                 <Input
@@ -115,7 +112,7 @@ export function Login() {
                 disabled={submitting || !email || !password}
               >
                 {submitting && <Loader2 className="size-4 animate-spin" />}
-                {submitting ? 'Connexion…' : 'Se connecter'}
+                {submitting ? 'Une seconde…' : 'C’est parti'}
               </Button>
             </form>
           </CardContent>
