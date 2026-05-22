@@ -1,11 +1,11 @@
 import { Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
+import penguinHero from '@/assets/penguin-hero.png'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -39,35 +39,31 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/20 px-4 py-10">
-      <div className="flex w-full max-w-sm flex-col items-center gap-6">
-        {/* Brand mark + wordmark ------------------------------------------ */}
-        <div className="flex flex-col items-center gap-3 text-center">
-          <img
-            src="/favicon.png"
-            alt="Growth With Flow"
-            width={48}
-            height={48}
-            className="size-12 rounded-xl shadow-sm"
-          />
-          <div className="space-y-0.5">
-            <h1 className="text-2xl font-semibold tracking-tight">Fabienne</h1>
-            <p className="text-sm text-muted-foreground">
-              Ton assistante de sourcing BtoB, par{' '}
-              <span className="font-medium text-foreground">
-                Growth With Flow
-              </span>
-              .
-            </p>
-          </div>
+      <div className="flex w-full max-w-sm flex-col items-center gap-5">
+        {/* Hero illustration --------------------------------------------- */}
+        <img
+          src={penguinHero}
+          alt="Prospection Automatisée — Growth With Flow"
+          width={220}
+          height={152}
+          className="h-auto w-44 select-none sm:w-52"
+          draggable={false}
+        />
+
+        {/* Wordmark + tagline ------------------------------------------- */}
+        <div className="flex flex-col items-center gap-1 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Prospection Automatisée
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            On trouve vos prochains clients pendant que vous faites le reste.
+          </p>
         </div>
 
         {/* Login card ---------------------------------------------------- */}
         <Card className="w-full">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Connexion</CardTitle>
-            <CardDescription>
-              Reprends là où tu t'étais arrêté.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -124,11 +120,6 @@ export function Login() {
             </form>
           </CardContent>
         </Card>
-
-        {/* Help footer --------------------------------------------------- */}
-        <p className="text-center text-[11px] text-muted-foreground">
-          Pas encore de compte ? Demande un accès à ton admin Growth With Flow.
-        </p>
       </div>
     </div>
   )

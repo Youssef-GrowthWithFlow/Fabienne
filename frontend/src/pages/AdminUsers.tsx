@@ -406,13 +406,11 @@ function CreateUserDrawer({
           </div>
 
           <DrawerFooter className="flex-row justify-end">
-            <DrawerClose
-              render={
-                <Button type="button" variant="ghost" disabled={submitting}>
-                  Annuler
-                </Button>
-              }
-            />
+            <DrawerClose asChild>
+              <Button type="button" variant="ghost" disabled={submitting}>
+                Annuler
+              </Button>
+            </DrawerClose>
             <Button
               type="submit"
               disabled={!canSubmit || submitting}

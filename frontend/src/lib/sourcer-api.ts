@@ -131,7 +131,6 @@ export async function runSourcingStream(
   let finalResult: SourcerRunResponse | null = null
   let errorMsg: string | null = null
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { done, value } = await reader.read()
     if (done) break

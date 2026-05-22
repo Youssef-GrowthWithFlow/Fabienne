@@ -10,11 +10,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Label,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  RadialBar,
-  RadialBarChart,
   XAxis,
   YAxis,
 } from 'recharts'
@@ -55,7 +50,6 @@ import {
   WEEKLY_GOALS,
   contactedPerDayThisWeek,
   countContactedThisWeek,
-  countCreatedThisWeek,
   hasReachedRank,
   isThisWeek,
   isRelanceOverdue,
@@ -112,270 +106,6 @@ function dayLabel(d: Date, todayIso: string): string {
     day: 'numeric',
     month: 'long',
   })
-}
-
-type GoalAction = {
-  id: string
-  nom: string
-  entreprise: string
-  date: string
-}
-
-function GoalRadial({
-  title,
-  description,
-  value,
-  target,
-  actions,
-  color,
-  configKey,
-  onOpenProspect,
-}: {
-  title: string
-  description: string
-  value: number
-  target: number
-  actions: GoalAction[]
-  color: string
-  configKey: 'created' | 'contacted'
-  onOpenProspect: (id: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const clamped = Math.min(value, target)
-  const reached = value >= target
-
-  const chartConfig = {
-    value: { label: title },
-    [configKey]: { label: title, color },
-  } satisfies ChartConfig
-
-  const data = [
-    {
-      stage: configKey,
-      value: clamped,
-      fill: `var(--color-${configKey})`,
-    },
-  ]
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="hover:bg-accent/20 flex flex-col items-center gap-1 rounded-lg p-2 text-center transition-colors"
-      >
-        <div className="text-sm font-medium sm:text-base">{title}</div>
-        <div className="text-muted-foreground text-xs">{description}</div>
-        <ChartContainer
-          config={chartConfig}
-          className="mx-auto aspect-square w-full max-w-[200px]"
-        >
-          <RadialBarChart
-            data={data}
-            startAngle={90}
-            endAngle={-270}
-            innerRadius="85%"
-            outerRadius="100%"
-          >
-            <PolarAngleAxis
-              type="number"
-              domain={[0, target]}
-              tick={false}
-              axisLine={false}
-            />
-            <RadialBar dataKey="value" background cornerRadius={10} />
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent
-                  hideIndicator
-                  formatter={() => {
-                    const remaining = Math.max(0, target - value)
-                    const daysLeft = Math.max(
-                      0,
-                      7 - ((new Date().getDay() + 6) % 7) - 1,
-                    )
-                    return (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium tabular-nums">
-                          {value} / {target} ·{' '}
-                          {Math.round((clamped / target) * 100)}%
-                        </span>
-                        <span className="text-muted-foreground text-[11px]">
-                          {reached
-                            ? 'Objectif atteint'
-                            : `${remaining} restant${remaining > 1 ? 's' : ''} · ${daysLeft}j cette semaine`}
-                        </span>
-                      </div>
-                    )
-                  }}
-                />
-              }
-            />
-            <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-              <Label
-                content={({ viewBox }) => {
-                  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                    return (
-                      <text
-                        x={viewBox.cx}
-                        y={viewBox.cy}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                      >
-                        <tspan
-                          x={viewBox.cx}
-                          y={viewBox.cy}
-                          className={cn(
-                            'fill-foreground text-3xl font-bold tabular-nums',
-                            reached && 'fill-emerald-600',
-                          )}
-                        >
-                          {value}
-                        </tspan>
-                        <tspan
-                          x={viewBox.cx}
-                          y={(viewBox.cy || 0) + 22}
-                          className="fill-muted-foreground text-xs tabular-nums"
-                        >
-                          / {target}
-                        </tspan>
-                      </text>
-                    )
-                  }
-                }}
-              />
-          </PolarRadiusAxis>
-          </RadialBarChart>
-        </ChartContainer>
-      </button>
-
-      <GoalDetailsSheet
-        open={open}
-        onOpenChange={setOpen}
-        title={title}
-        description={description}
-        value={value}
-        target={target}
-        actions={actions}
-        onOpenProspect={onOpenProspect}
-      />
-    </>
-  )
-}
-
-function GoalDetailsSheet({
-  open,
-  onOpenChange,
-  title,
-  description,
-  value,
-  target,
-  actions,
-  onOpenProspect,
-}: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  title: string
-  description: string
-  value: number
-  target: number
-  actions: GoalAction[]
-  onOpenProspect: (id: string) => void
-}) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="flex !w-full flex-col gap-0 p-0 sm:!max-w-none lg:!w-[60vw]"
-      >
-        <div className="border-b px-4 py-4 sm:px-6">
-          <p className="text-muted-foreground text-xs uppercase tracking-wide">
-            Objectif hebdo
-          </p>
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <p className="text-muted-foreground mt-1 text-sm">{description}</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums">
-            {value}
-            <span className="text-muted-foreground ml-1 text-base font-medium">
-              / {target}
-            </span>
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-          {actions.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center text-sm italic">
-              Aucune action enregistrée cette semaine.
-            </p>
-          ) : (
-            <>
-              <ul className="flex flex-col gap-2 sm:hidden">
-                {actions.map((a) => (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenChange(false)
-                        onOpenProspect(a.id)
-                      }}
-                      className="bg-card hover:bg-muted/40 flex w-full items-start justify-between gap-3 rounded-xl border p-3 text-left shadow-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{a.nom}</p>
-                        <p className="text-muted-foreground truncate text-xs">
-                          {a.entreprise}
-                        </p>
-                      </div>
-                      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                        {new Date(a.date).toLocaleDateString('fr-FR', {
-                          day: '2-digit',
-                          month: 'short',
-                        })}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <div className="hidden rounded-xl border sm:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Prospect</TableHead>
-                      <TableHead>Entreprise</TableHead>
-                      <TableHead className="text-right">Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {actions.map((a) => (
-                      <TableRow
-                        key={a.id}
-                        className="cursor-pointer"
-                        onClick={() => {
-                          onOpenChange(false)
-                          onOpenProspect(a.id)
-                        }}
-                      >
-                        <TableCell className="font-medium">{a.nom}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {a.entreprise}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-right tabular-nums">
-                          {new Date(a.date).toLocaleDateString('fr-FR', {
-                            day: '2-digit',
-                            month: 'short',
-                          })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-  )
 }
 
 function OverdueBlock({
@@ -1273,7 +1003,6 @@ export function Dashboard() {
   const { candidates: sourcerCandidates } = useSourcerHistory()
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const created = countCreatedThisWeek(prospects)
   const contacted = countContactedThisWeek(prospects)
 
   // Sourcing : tout candidat sourcé cette semaine (peu importe le statut)
@@ -1292,32 +1021,6 @@ export function Dashboard() {
   )
   const contactsPerDay = useMemo(
     () => contactedPerDayThisWeek(prospects),
-    [prospects],
-  )
-  const createdActions = useMemo<GoalAction[]>(
-    () =>
-      prospects
-        .filter((p) => isThisWeek(p.createdAt))
-        .map((p) => ({
-          id: p.id,
-          nom: p.nom || 'Sans nom',
-          entreprise: p.entreprise?.entreprise ?? '',
-          date: p.createdAt,
-        }))
-        .sort((a, b) => (a.date < b.date ? 1 : -1)),
-    [prospects],
-  )
-  const contactedActions = useMemo<GoalAction[]>(
-    () =>
-      prospects
-        .filter((p) => p.contactedAt && isThisWeek(p.contactedAt))
-        .map((p) => ({
-          id: p.id,
-          nom: p.nom || 'Sans nom',
-          entreprise: p.entreprise?.entreprise ?? '',
-          date: p.contactedAt!,
-        }))
-        .sort((a, b) => (a.date < b.date ? 1 : -1)),
     [prospects],
   )
   const relances = relancesDues(prospects)

@@ -232,13 +232,11 @@ export function ActionDialog({ open, onOpenChange, onSubmit }: Props) {
           </div>
 
           <DrawerFooter className="flex-row justify-end">
-            <DrawerClose
-              render={
-                <Button variant="ghost" disabled={submitting}>
-                  Annuler
-                </Button>
-              }
-            />
+            <DrawerClose asChild>
+              <Button variant="ghost" disabled={submitting}>
+                Annuler
+              </Button>
+            </DrawerClose>
             <Button onClick={submit} disabled={!canSubmit || submitting}>
               {submitting ? 'Enregistrement…' : 'Enregistrer'}
             </Button>

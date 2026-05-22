@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, Pencil, Trash2 } from 'lucide-react'
+import { Check, ChevronLeft, Pencil, Trash2, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import {
@@ -11,7 +11,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

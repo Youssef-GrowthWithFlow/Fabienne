@@ -166,13 +166,11 @@ export function SourcerLaunchDrawer({ open, onOpenChange }: Props) {
 
           <DrawerFooter className="flex-row justify-between">
             {step === 1 ? (
-              <DrawerClose
-                render={
-                  <Button type="button" variant="ghost">
-                    Annuler
-                  </Button>
-                }
-              />
+              <DrawerClose asChild>
+                <Button type="button" variant="ghost">
+                  Annuler
+                </Button>
+              </DrawerClose>
             ) : (
               <Button type="button" variant="ghost" onClick={() => setStep(1)}>
                 Précédent

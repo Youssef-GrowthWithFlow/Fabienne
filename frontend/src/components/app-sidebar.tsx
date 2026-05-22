@@ -48,7 +48,9 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
             height={20}
             className="size-5 shrink-0 rounded"
           />
-          <span className="group-data-[collapsible=icon]:hidden">Fabienne</span>
+          <span className="group-data-[collapsible=icon]:hidden">
+            Prospection Automatisée
+          </span>
         </div>
       </SidebarHeader>
 

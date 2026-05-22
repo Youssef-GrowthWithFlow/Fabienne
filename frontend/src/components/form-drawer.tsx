@@ -74,13 +74,11 @@ export function FormDrawer({
           <div className="flex flex-col gap-3 px-4 pb-2">{children}</div>
 
           <DrawerFooter className="flex-row justify-end">
-            <DrawerClose
-              render={
-                <Button type="button" variant="ghost" disabled={submitting}>
-                  {cancelLabel}
-                </Button>
-              }
-            />
+            <DrawerClose asChild>
+              <Button type="button" variant="ghost" disabled={submitting}>
+                {cancelLabel}
+              </Button>
+            </DrawerClose>
             <Button type="submit" disabled={!canSubmit || submitting}>
               {submitting ? submittingLabel : submitLabel}
             </Button>
