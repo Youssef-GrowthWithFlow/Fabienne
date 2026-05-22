@@ -10,34 +10,91 @@ import {
 import { toast } from 'sonner'
 
 import {
-  FICHE_CLIENT_TEMPLATE,
-  initialProspects,
-  newId,
   todayIso,
+  type Comment,
   type Prospect,
 } from '@/lib/prospects'
+import {
+  createProspect as apiCreateProspect,
+  deleteProspect as apiDeleteProspect,
+  listProspects as apiListProspects,
+  updateProspect as apiUpdateProspect,
+} from '@/lib/prospects-api'
+import { createAction as apiCreateAction } from '@/lib/actions-api'
+import type { ActivityKind } from '@/lib/prospects'
+import {
+  createComment as apiCreateComment,
+  deleteComment as apiDeleteComment,
+  updateComment as apiUpdateComment,
+} from '@/lib/comments-api'
+import { useActions } from '@/hooks/use-actions'
 
 type ProspectsContextValue = {
   prospects: Prospect[]
   loading: boolean
   getProspect: (id: string) => Prospect | undefined
   updateProspect: (next: Prospect) => void
-  createProspect: () => string
+  replaceProspectLocal: (next: Prospect) => void
+  createProspect: (
+    input?: Partial<Omit<Prospect, 'id' | 'comments'>>,
+  ) => Promise<string | null>
+  addProspect: (prospect: Prospect) => void
   deleteProspect: (id: string) => void
+  addComment: (prospectId: string, texte: string) => Promise<void>
+  updateComment: (
+    prospectId: string,
+    commentId: string,
+    texte: string,
+  ) => Promise<void>
+  deleteComment: (prospectId: string, commentId: string) => Promise<void>
+  logAction: (
+    prospectId: string,
+    kind: ActivityKind,
+    metadata?: Record<string, unknown>,
+    at?: string,
+  ) => Promise<void>
 }
 
 const ProspectsContext = createContext<ProspectsContextValue | null>(null)
 
+function emptyProspect(): Omit<Prospect, 'id'> {
+  return {
+    nom: '',
+    role: '',
+    entrepriseId: null,
+    entreprise: null,
+    telephone: '',
+    email: '',
+    linkedin: null,
+    fieldSources: {},
+    comments: [],
+    status: 'À contacter',
+    createdAt: todayIso(),
+    contactedAt: null,
+    relanceDate: null,
+  }
+}
+
 export function ProspectsProvider({ children }: { children: ReactNode }) {
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
+  const { refresh: refreshActions } = useActions()
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setProspects(initialProspects)
-      setLoading(false)
-    }, 700)
-    return () => clearTimeout(t)
+    let cancelled = false
+    apiListProspects()
+      .then((data) => {
+        if (!cancelled) setProspects(data)
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Impossible de charger les prospects')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const getProspect = useCallback(
@@ -45,52 +102,198 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
     [prospects],
   )
 
-  const updateProspect = useCallback((next: Prospect) => {
-    setProspects((list) => {
-      let changed = false
-      const out = list.map((p) => {
-        if (p.id !== next.id) return p
-        if (p === next) return p
-        changed = true
+  const updateProspect = useCallback(
+    (next: Prospect) => {
+      let prev: Prospect | undefined
+      let adjusted: Prospect | undefined
+      setProspects((list) => {
+        prev = list.find((p) => p.id === next.id)
+        if (!prev) return list
         const isNowContacted =
-          next.status !== 'À contacter' && p.status === 'À contacter'
-        if (isNowContacted && !next.contactedAt) {
-          return { ...next, contactedAt: todayIso() }
-        }
-        return next
+          next.status !== 'À contacter' && prev.status === 'À contacter'
+        adjusted =
+          isNowContacted && !next.contactedAt
+            ? { ...next, contactedAt: todayIso() }
+            : next
+        return list.map((p) => (p.id === adjusted!.id ? adjusted! : p))
       })
-      return changed ? out : list
-    })
+      if (!prev || !adjusted) return
+
+      const snapshot = prev
+      const sent = adjusted
+      apiUpdateProspect(sent.id, sent)
+        .then((updated) => {
+          setProspects((list) =>
+            list.map((p) => (p.id === updated.id ? updated : p)),
+          )
+          if (snapshot.status !== sent.status) refreshActions()
+        })
+        .catch(() => {
+          toast.error('Échec de la mise à jour')
+          setProspects((list) =>
+            list.map((p) => (p.id === snapshot.id ? snapshot : p)),
+          )
+        })
+    },
+    [refreshActions],
+  )
+
+  const replaceProspectLocal = useCallback((next: Prospect) => {
+    setProspects((list) =>
+      list.map((p) => (p.id === next.id ? next : p)),
+    )
   }, [])
 
-  const createProspect = useCallback(() => {
-    const id = newId('p')
-    const next: Prospect = {
-      id,
-      nom: '',
-      entreprise: '',
-      role: '',
-      segment: null,
-      telephone: '',
-      email: '',
-      linkedin: null,
-      website: null,
-      ficheClient: FICHE_CLIENT_TEMPLATE,
-      comments: [],
-      status: 'À contacter',
-      createdAt: todayIso(),
-      contactedAt: null,
-      relanceDate: null,
-    }
-    setProspects((list) => [next, ...list])
-    toast.success('Prospect créé')
-    return id
-  }, [])
+  const createProspect = useCallback(
+    async (
+      input?: Partial<Omit<Prospect, 'id' | 'comments'>>,
+    ): Promise<string | null> => {
+      try {
+        const draft = { ...emptyProspect(), ...input, id: '' } as Prospect
+        const created = await apiCreateProspect(draft)
+        setProspects((list) => [created, ...list])
+        toast.success('Prospect créé')
+        refreshActions()
+        return created.id
+      } catch {
+        toast.error('Échec de la création')
+        return null
+      }
+    },
+    [refreshActions],
+  )
 
-  const deleteProspect = useCallback((id: string) => {
-    setProspects((list) => list.filter((p) => p.id !== id))
-    toast.success('Prospect supprimé')
-  }, [])
+  const addProspect = useCallback(
+    (prospect: Prospect) => {
+      let inserted = false
+      setProspects((list) => {
+        if (list.some((p) => p.id === prospect.id)) return list
+        inserted = true
+        return [prospect, ...list]
+      })
+      if (inserted) refreshActions()
+    },
+    [refreshActions],
+  )
+
+  const deleteProspect = useCallback(
+    (id: string) => {
+      let prev: Prospect[] = []
+      setProspects((list) => {
+        prev = list
+        return list.filter((p) => p.id !== id)
+      })
+      apiDeleteProspect(id)
+        .then(() => {
+          toast.success('Prospect supprimé')
+          refreshActions()
+        })
+        .catch(() => {
+          toast.error('Échec de la suppression')
+          setProspects(prev)
+        })
+    },
+    [refreshActions],
+  )
+
+  const setProspectComments = useCallback(
+    (prospectId: string, mutate: (cs: Comment[]) => Comment[]) => {
+      setProspects((list) =>
+        list.map((p) =>
+          p.id === prospectId ? { ...p, comments: mutate(p.comments) } : p,
+        ),
+      )
+    },
+    [],
+  )
+
+  const addComment = useCallback(
+    async (prospectId: string, texte: string): Promise<void> => {
+      try {
+        const created = await apiCreateComment(prospectId, {
+          date: new Date().toISOString(),
+          texte,
+        })
+        setProspectComments(prospectId, (cs) => [created, ...cs])
+        toast.success('Commentaire ajouté')
+      } catch {
+        toast.error('Échec de l’ajout du commentaire')
+      }
+    },
+    [setProspectComments],
+  )
+
+  const updateComment = useCallback(
+    async (
+      prospectId: string,
+      commentId: string,
+      texte: string,
+    ): Promise<void> => {
+      let previous: Comment | undefined
+      setProspectComments(prospectId, (cs) => {
+        previous = cs.find((c) => c.id === commentId)
+        return cs.map((c) => (c.id === commentId ? { ...c, texte } : c))
+      })
+      try {
+        const updated = await apiUpdateComment(prospectId, commentId, { texte })
+        setProspectComments(prospectId, (cs) =>
+          cs.map((c) => (c.id === commentId ? updated : c)),
+        )
+      } catch {
+        toast.error('Échec de la mise à jour du commentaire')
+        if (previous) {
+          const snapshot = previous
+          setProspectComments(prospectId, (cs) =>
+            cs.map((c) => (c.id === commentId ? snapshot : c)),
+          )
+        }
+      }
+    },
+    [setProspectComments],
+  )
+
+  const deleteComment = useCallback(
+    async (prospectId: string, commentId: string): Promise<void> => {
+      let previous: Comment[] = []
+      setProspectComments(prospectId, (cs) => {
+        previous = cs
+        return cs.filter((c) => c.id !== commentId)
+      })
+      try {
+        await apiDeleteComment(prospectId, commentId)
+        toast.success('Commentaire supprimé')
+      } catch {
+        toast.error('Échec de la suppression du commentaire')
+        setProspectComments(prospectId, () => previous)
+      }
+    },
+    [setProspectComments],
+  )
+
+  const logAction = useCallback(
+    async (
+      prospectId: string,
+      kind: ActivityKind,
+      metadata?: Record<string, unknown>,
+      at?: string,
+    ): Promise<void> => {
+      try {
+        const { prospect: fresh } = await apiCreateAction(prospectId, {
+          kind,
+          metadata,
+          at,
+        })
+        setProspects((list) =>
+          list.map((p) => (p.id === prospectId ? fresh : p)),
+        )
+        refreshActions()
+        toast.success('Action enregistrée')
+      } catch {
+        toast.error('Échec de l’action')
+      }
+    },
+    [refreshActions],
+  )
 
   const value = useMemo<ProspectsContextValue>(
     () => ({
@@ -98,16 +301,28 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
       loading,
       getProspect,
       updateProspect,
+      replaceProspectLocal,
       createProspect,
+      addProspect,
       deleteProspect,
+      addComment,
+      updateComment,
+      deleteComment,
+      logAction,
     }),
     [
       prospects,
       loading,
       getProspect,
       updateProspect,
+      replaceProspectLocal,
       createProspect,
+      addProspect,
       deleteProspect,
+      addComment,
+      updateComment,
+      deleteComment,
+      logAction,
     ],
   )
 

@@ -1,17 +1,20 @@
 import {
+  Building2,
   CalendarClock,
   Check,
   CheckCircle2,
-  ChevronLeft,
   CircleDot,
-  Globe,
+  Copy,
   Handshake,
   Link2,
+  Loader2,
   Mail,
   MessageSquare,
-  Pencil,
   Phone,
+  Plus,
   Send,
+  Sparkles,
+  Target,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -29,6 +32,7 @@ function LinkedinIcon({ className }: { className?: string }) {
   )
 }
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronLeft } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,13 +55,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
   Tabs,
@@ -66,25 +68,24 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { ActionDialog, type ActionDialogKind } from '@/components/action-dialog'
+import { SourceBadge } from '@/components/source-badge'
+import { useActions } from '@/hooks/use-actions'
+import { useEntreprises } from '@/hooks/use-entreprises'
 import { useProspects } from '@/hooks/use-prospects'
-import { useSegments } from '@/hooks/use-segments'
+import { regenerateEntrepriseFiche } from '@/lib/entreprises-api'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  STATUS_RANK,
   STATUSES,
   formatDate,
-  newId,
   sortComments,
   statusVariant,
-  todayIso,
+  type ActivityKind,
   type Comment,
   type Prospect,
   type ProspectStatus,
 } from '@/lib/prospects'
-
-const MESSAGE_CHANNELS = ['LinkedIn', 'Email', 'Téléphone', 'SMS', 'Autre'] as const
-type MessageChannel = (typeof MESSAGE_CHANNELS)[number]
-
 
 type InlineProps = {
   value: string
@@ -152,54 +153,55 @@ function Row({
   icon: Icon,
   label,
   children,
+  copyValue,
+  source,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   children: ReactNode
+  copyValue?: string | null
+  source?: string | null
 }) {
   return (
     <div className="group flex flex-col gap-0 rounded-md py-1.5 sm:flex-row sm:items-start sm:gap-2 sm:py-0.5">
       <div className="text-muted-foreground flex shrink-0 items-center gap-2 px-2 py-1 text-xs sm:w-32 sm:py-1.5 sm:text-sm">
         <Icon className="size-3.5" />
         <span>{label}</span>
+        {source ? <SourceBadge source={source} /> : null}
       </div>
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="flex min-w-0 flex-1 items-start gap-1">
+        <div className="min-w-0 flex-1">{children}</div>
+        {copyValue ? <CopyButton value={copyValue} /> : null}
+      </div>
     </div>
   )
 }
 
-
-function SegmentSelector({
-  value,
-  onChange,
-}: {
-  value: Prospect['segment']
-  onChange: (v: Prospect['segment']) => void
-}) {
-  const { segments, briefs } = useSegments()
-  const label = (id: string) => briefs[id]?.nom ?? id
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-2 py-1">
-      {segments.map((s) => {
-        const active = value === s
-        return (
-          <button
-            key={s}
-            type="button"
-            onClick={() => onChange(active ? null : s)}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
-              active
-                ? 'bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-200'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground border border-dashed',
-            )}
-          >
-            <CircleDot className="size-2.5" />
-            {label(s)}
-          </button>
-        )
-      })}
-    </div>
+    <button
+      type="button"
+      onClick={async (e) => {
+        e.stopPropagation()
+        try {
+          await navigator.clipboard.writeText(value)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1200)
+        } catch {
+          // ignore
+        }
+      }}
+      title="Copier"
+      aria-label="Copier"
+      className="text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+    >
+      {copied ? (
+        <Check className="size-3.5" />
+      ) : (
+        <Copy className="size-3.5" />
+      )}
+    </button>
   )
 }
 
@@ -231,46 +233,6 @@ function StatusBadge({
         ))}
       </SelectContent>
     </Select>
-  )
-}
-
-
-function QuickAction({
-  icon: Icon,
-  label,
-  href,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  href: string | null
-}) {
-  const base =
-    'inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors'
-  if (!href) {
-    return (
-      <span
-        aria-disabled
-        title={`${label} indisponible`}
-        aria-label={label}
-        className={cn(base, 'text-muted-foreground/50 cursor-not-allowed')}
-      >
-        <Icon className="size-4" />
-        <span className="hidden sm:inline">{label}</span>
-      </span>
-    )
-  }
-  return (
-    <a
-      href={href}
-      target={href.startsWith('http') ? '_blank' : undefined}
-      rel={href.startsWith('http') ? 'noreferrer' : undefined}
-      title={label}
-      aria-label={label}
-      className={cn(base, 'text-foreground hover:bg-muted')}
-    >
-      <Icon className="size-4" />
-      <span className="hidden sm:inline">{label}</span>
-    </a>
   )
 }
 
@@ -316,8 +278,21 @@ function CommentComposer({
   )
 }
 
+const ACTION_KIND_LABEL: Record<ActivityKind, string> = {
+  created: 'Prospect créé',
+  message: 'Message envoyé',
+  reply: 'Message reçu',
+  discussion: 'En discussion',
+  meeting: 'RDV pris',
+  won: 'Client gagné',
+  lost: 'Refus',
+  no_reply: 'Sans réponse',
+}
+
+
 function CommentCard({
   comment,
+  actionKind,
   editing,
   onStartEdit,
   onSave,
@@ -325,6 +300,7 @@ function CommentCard({
   onDelete,
 }: {
   comment: Comment
+  actionKind?: ActivityKind | null
   editing: boolean
   onStartEdit: () => void
   onSave: (text: string) => void
@@ -347,10 +323,17 @@ function CommentCard({
     onSave(t)
   }
 
+  const actionLabel = actionKind ? ACTION_KIND_LABEL[actionKind] ?? null : null
+
   return (
     <div className="py-2.5 first:pt-0">
-      <div className="text-muted-foreground mb-0.5 text-xs tabular-nums">
-        {formatDate(comment.date)}
+      <div className="text-muted-foreground mb-0.5 flex items-center gap-2 text-xs tabular-nums">
+        <span>{formatDate(comment.date)}</span>
+        {actionLabel ? (
+          <span className="border-input bg-muted/40 text-muted-foreground rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+            {actionLabel}
+          </span>
+        ) : null}
       </div>
       {editing ? (
         <>
@@ -429,91 +412,6 @@ function CommentCard({
 }
 
 
-function MessageSentDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-}: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  onSubmit: (channel: MessageChannel, texte: string) => void
-}) {
-  const [channel, setChannel] = useState<MessageChannel>('LinkedIn')
-  const [texte, setTexte] = useState('')
-
-  useEffect(() => {
-    if (open) {
-      setChannel('LinkedIn')
-      setTexte('')
-    }
-  }, [open])
-
-  const canSubmit = texte.trim().length > 0
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Message envoyé</DialogTitle>
-          <DialogDescription>
-            Sur quel canal et quel était le message ?
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-muted-foreground text-xs">Canal</span>
-            <div className="flex flex-wrap gap-1.5">
-              {MESSAGE_CHANNELS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setChannel(c)}
-                  className={cn(
-                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                    channel === c
-                      ? 'border-foreground bg-foreground text-background'
-                      : 'border-input text-muted-foreground hover:bg-muted',
-                  )}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-muted-foreground text-xs">
-              Description (une ligne)
-            </span>
-            <Input
-              autoFocus
-              value={texte}
-              onChange={(e) => setTexte(e.target.value)}
-              placeholder="Ex. prise de contact, proposition de démo…"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && canSubmit) {
-                  e.preventDefault()
-                  onSubmit(channel, texte.trim())
-                }
-              }}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Annuler
-          </Button>
-          <Button
-            disabled={!canSubmit}
-            onClick={() => onSubmit(channel, texte.trim())}
-          >
-            Enregistrer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 export function ProspectSheet({
   prospect,
   onClose,
@@ -523,42 +421,66 @@ export function ProspectSheet({
   onClose: () => void
   onChange: (next: Prospect) => void
 }) {
-  const { deleteProspect } = useProspects()
-  const [editingFiche, setEditingFiche] = useState(false)
+  const {
+    deleteProspect,
+    addComment: hookAddComment,
+    updateComment: hookUpdateComment,
+    deleteComment: hookDeleteComment,
+    logAction,
+  } = useProspects()
+  const { ingestMany: ingestEntreprises } = useEntreprises()
+  const { actions: allActions } = useActions()
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [messageOpen, setMessageOpen] = useState(false)
+  const [actionDialog, setActionDialog] = useState<ActionDialogKind | null>(null)
+  const [regeneratingFiche, setRegeneratingFiche] = useState(false)
 
   useEffect(() => {
-    setEditingFiche(false)
     setEditingCommentId(null)
+    setRegeneratingFiche(false)
   }, [prospect.id])
+
+  const handleRegenerateFiche = async () => {
+    const entrepriseId = prospect.entreprise?.id
+    if (!entrepriseId) return
+    setRegeneratingFiche(true)
+    try {
+      const updated = await regenerateEntrepriseFiche(entrepriseId)
+      ingestEntreprises([updated])
+      // Mirror the new fiche into the prospect's nested entreprise summary so
+      // the tab reflects immediately without a full prospect re-fetch.
+      onChange({
+        ...prospect,
+        entreprise: prospect.entreprise
+          ? {
+              ...prospect.entreprise,
+              ficheClient: updated.ficheClient,
+              signaux: updated.signaux,
+            }
+          : prospect.entreprise,
+      })
+      toast.success('Fiche régénérée.')
+    } catch {
+      toast.error('Échec de la régénération.')
+    } finally {
+      setRegeneratingFiche(false)
+    }
+  }
 
   const update = <K extends keyof Prospect>(key: K, value: Prospect[K]) => {
     onChange({ ...prospect, [key]: value })
   }
 
   const addComment = (texte: string) => {
-    const next: Comment = {
-      id: newId('c'),
-      date: new Date().toISOString(),
-      texte,
-    }
-    update('comments', [next, ...prospect.comments])
+    hookAddComment(prospect.id, texte)
   }
 
   const updateComment = (id: string, texte: string) => {
-    update(
-      'comments',
-      prospect.comments.map((c) => (c.id === id ? { ...c, texte } : c)),
-    )
+    hookUpdateComment(prospect.id, id, texte)
   }
 
   const deleteComment = (id: string) => {
-    update(
-      'comments',
-      prospect.comments.filter((c) => c.id !== id),
-    )
+    hookDeleteComment(prospect.id, id)
   }
 
   const confirmDelete = () => {
@@ -572,29 +494,53 @@ export function ProspectSheet({
     [prospect.comments],
   )
 
+  const actionsById = useMemo(
+    () => new Map(allActions.map((a) => [a.id, a])),
+    [allActions],
+  )
+
+
   return (
-    <Sheet open onOpenChange={(o) => !o && onClose()}>
+    <Sheet
+      open
+      modal={false}
+      onOpenChange={(o, details) => {
+        if (o) return
+        if (
+          details?.reason === 'close-press' ||
+          details?.reason === 'escape-key'
+        ) {
+          onClose()
+        }
+      }}
+    >
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="flex !w-full flex-col gap-0 p-0 sm:!max-w-none lg:!w-[60vw]"
       >
-        {/* Top bar mobile : retour */}
-        <div className="flex shrink-0 items-center border-b px-2 py-2 sm:hidden">
-          <Button variant="ghost" size="sm" onClick={onClose}>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2 py-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="gap-1.5"
+          >
             <ChevronLeft className="size-4" />
             Retour
           </Button>
+          <span className="truncate px-2 text-sm font-medium text-muted-foreground">
+            {prospect.nom || prospect.entreprise?.entreprise || 'Prospect'}
+          </span>
         </div>
-
-        {/* Tabs */}
         <Tabs
           defaultValue="coordonnees"
           className="flex min-h-0 flex-1 flex-col gap-0"
         >
-          <div className="border-b px-4 sm:px-6 pt-4 pr-14 pb-2">
+          <div className="border-b px-4 sm:px-6 pt-3 pb-2">
             <TabsList>
               <TabsTrigger value="coordonnees">Coordonnées</TabsTrigger>
-              <TabsTrigger value="fiche-client">Fiche client</TabsTrigger>
+              <TabsTrigger value="fiche-client">Fiche entreprise</TabsTrigger>
               <TabsTrigger value="activite">Activité</TabsTrigger>
             </TabsList>
           </div>
@@ -603,32 +549,51 @@ export function ProspectSheet({
             value="coordonnees"
             className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4"
           >
-            <Row icon={Users} label="Nom">
+            <Row
+              icon={Users}
+              label="Nom"
+              source={prospect.fieldSources?.nom}
+            >
               <InlineText
                 value={prospect.nom}
                 onChange={(v) => update('nom', v)}
                 placeholder="Nom du prospect"
               />
             </Row>
-            <Row icon={Users} label="Entreprise">
-              <InlineText
-                value={prospect.entreprise}
-                onChange={(v) => update('entreprise', v)}
-                placeholder="Nom de l'entreprise"
-              />
-            </Row>
-            <Row icon={Users} label="Rôle">
+            <Row
+              icon={Users}
+              label="Rôle"
+              source={prospect.fieldSources?.role}
+            >
               <InlineText
                 value={prospect.role}
                 onChange={(v) => update('role', v)}
                 placeholder="Pharmacien titulaire…"
               />
             </Row>
-            <Row icon={CircleDot} label="Segment">
-              <SegmentSelector
-                value={prospect.segment}
-                onChange={(v) => update('segment', v)}
-              />
+            <Row icon={Building2} label="Entreprise">
+              <div className="px-2 py-1 text-sm">
+                {prospect.entreprise ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium">
+                      {prospect.entreprise.entreprise || (
+                        <span className="italic text-muted-foreground">
+                          Sans nom
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {[prospect.entreprise.ville, prospect.entreprise.siteWeb]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="italic text-muted-foreground">
+                    Aucune entreprise rattachée
+                  </span>
+                )}
+              </div>
             </Row>
             <Row icon={CircleDot} label="Statut">
               <div className="px-2 py-1">
@@ -638,8 +603,67 @@ export function ProspectSheet({
                 />
               </div>
             </Row>
-            <Row icon={CalendarClock} label="Relance">
-              <div className="px-2 py-1">
+            <Row icon={Mail} label="Email" copyValue={prospect.email || null}>
+              <InlineText
+                type="email"
+                value={prospect.email}
+                onChange={(v) => update('email', v)}
+                placeholder="contact@exemple.com"
+              />
+            </Row>
+            <Row
+              icon={Phone}
+              label="Téléphone"
+              copyValue={prospect.telephone || null}
+            >
+              <InlineText
+                type="tel"
+                value={prospect.telephone}
+                onChange={(v) => update('telephone', v)}
+                placeholder="06 12 34 56 78"
+              />
+            </Row>
+            <Row
+              icon={Link2}
+              label="LinkedIn"
+              copyValue={prospect.linkedin}
+              source={prospect.fieldSources?.linkedin}
+            >
+              <InlineText
+                type="url"
+                value={prospect.linkedin ?? ''}
+                onChange={(v) => update('linkedin', v ? v : null)}
+                placeholder="https://linkedin.com/in/…"
+              />
+            </Row>
+            {prospect.entreprise?.signaux &&
+              prospect.entreprise.signaux.length > 0 && (
+                <Row icon={Target} label="Signaux entreprise">
+                  <div className="flex flex-wrap gap-1.5 px-1 py-1">
+                    {prospect.entreprise.signaux.map((s, i) => (
+                      <Badge
+                        key={i}
+                        variant="outline"
+                        className="border-primary/20 bg-primary/[0.04] font-normal"
+                      >
+                        {s}
+                      </Badge>
+                    ))}
+                  </div>
+                </Row>
+              )}
+          </TabsContent>
+
+          <TabsContent
+            value="activite"
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 sm:px-6 py-4"
+          >
+            <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="text-muted-foreground size-3.5" />
+                <span className="text-sm">Prochaine relance</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Input
                   type="date"
                   value={prospect.relanceDate ?? ''}
@@ -648,158 +672,15 @@ export function ProspectSheet({
                   }
                   className="h-8 w-fit !text-sm"
                 />
-              </div>
-            </Row>
-            <Row icon={Mail} label="Email">
-              <InlineText
-                type="email"
-                value={prospect.email}
-                onChange={(v) => update('email', v)}
-                placeholder="contact@exemple.com"
-              />
-            </Row>
-            <Row icon={Phone} label="Téléphone">
-              <InlineText
-                type="tel"
-                value={prospect.telephone}
-                onChange={(v) => update('telephone', v)}
-                placeholder="06 12 34 56 78"
-              />
-            </Row>
-            <Row icon={Link2} label="LinkedIn">
-              <InlineText
-                type="url"
-                value={prospect.linkedin ?? ''}
-                onChange={(v) => update('linkedin', v ? v : null)}
-                placeholder="https://linkedin.com/in/…"
-              />
-            </Row>
-            <Row icon={Globe} label="Site web">
-              <InlineText
-                type="url"
-                value={prospect.website ?? ''}
-                onChange={(v) => update('website', v ? v : null)}
-                placeholder="https://exemple.com"
-              />
-            </Row>
-          </TabsContent>
-
-          <TabsContent
-            value="fiche-client"
-            className="flex min-h-0 flex-1 flex-col"
-          >
-            <div className="flex shrink-0 items-center gap-1.5 px-4 sm:px-6 pt-3 pb-2">
-              {editingFiche ? (
-                <Button
-                  onClick={() => setEditingFiche(false)}
-                  className="ml-auto sm:ml-0 sm:h-7 sm:text-[0.8rem]"
-                >
-                  <Check className="size-3.5" />
-                  Terminé
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  onClick={() => setEditingFiche(true)}
-                  className="ml-auto sm:ml-0 sm:h-7 sm:text-[0.8rem]"
-                >
-                  <Pencil className="size-3.5" />
-                  Modifier
-                </Button>
-              )}
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 pb-3">
-              <RichTextEditor
-                value={prospect.ficheClient}
-                onChange={(html) => update('ficheClient', html)}
-                editable={editingFiche}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent
-            value="activite"
-            className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 sm:px-6 py-4"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground text-xs">Statut</span>
-              <StatusBadge
-                value={prospect.status}
-                onChange={(v) => update('status', v)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <span className="text-muted-foreground text-xs">
-                Enregistrer une action
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMessageOpen(true)}
-                >
-                  <Send className="size-3.5" />
-                  Message envoyé
-                </Button>
-                {(
-                  [
-                    {
-                      icon: MessageSquare,
-                      label: 'Réponse reçue',
-                      status: 'Répondu',
-                    },
-                    {
-                      icon: Handshake,
-                      label: 'RDV pris',
-                      status: 'RDV',
-                    },
-                    {
-                      icon: CheckCircle2,
-                      label: 'Client gagné',
-                      status: 'Client',
-                    },
-                  ] as const
-                ).map((a) => (
-                  <Button
-                    key={a.label}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      addComment(a.label)
-                      const nextRank = STATUS_RANK[a.status]
-                      const curRank = STATUS_RANK[prospect.status]
-                      if (nextRank > curRank) {
-                        onChange({ ...prospect, status: a.status })
-                      }
-                    }}
-                  >
-                    <a.icon className="size-3.5" />
-                    {a.label}
-                  </Button>
-                ))}
+                <span className="text-muted-foreground text-[11px]">
+                  Auto à J+7 après chaque action
+                </span>
               </div>
             </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <CalendarClock className="size-3.5" />
-                Prochaine relance
-              </span>
-              <Input
-                type="date"
-                value={prospect.relanceDate ?? ''}
-                onChange={(e) =>
-                  update('relanceDate', e.target.value ? e.target.value : null)
-                }
-                className="h-8 w-fit !text-sm"
-              />
-            </div>
-
             <CommentComposer onAdd={addComment} />
             {comments.length === 0 ? (
               <p className="text-muted-foreground py-6 text-center text-xs italic">
-                Aucun commentaire pour le moment.
+                Aucune activité pour le moment.
               </p>
             ) : (
               <div className="divide-border divide-y">
@@ -807,6 +688,7 @@ export function ProspectSheet({
                   <CommentCard
                     key={c.id}
                     comment={c}
+                    actionKind={actionsById.get(c.actionId ?? '')?.kind ?? null}
                     editing={editingCommentId === c.id}
                     onStartEdit={() => setEditingCommentId(c.id)}
                     onSave={(text) => {
@@ -823,35 +705,133 @@ export function ProspectSheet({
               </div>
             )}
           </TabsContent>
+
+          <TabsContent
+            value="fiche-client"
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <div className="flex min-h-0 flex-col">
+              <div className="flex shrink-0 items-center px-4 sm:px-6 pt-3 pb-2">
+                <span className="text-[11px] text-muted-foreground">
+                  Fiche de l'entreprise — partagée avec tous les contacts de
+                  cette entreprise.
+                </span>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 pb-3">
+                {prospect.entreprise?.ficheClient ? (
+                  <RichTextEditor
+                    value={prospect.entreprise.ficheClient}
+                    onChange={() => {}}
+                    editable={false}
+                  />
+                ) : prospect.entreprise ? (
+                  <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed bg-muted/20 py-10 text-center text-sm text-muted-foreground">
+                    <p>Aucune fiche générée pour cette entreprise.</p>
+                    <Button
+                      size="sm"
+                      onClick={handleRegenerateFiche}
+                      disabled={regeneratingFiche}
+                      className="gap-1.5"
+                    >
+                      {regeneratingFiche ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-3.5" />
+                      )}
+                      Générer la fiche
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    Pas d'entreprise rattachée — pas de fiche.
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
         </Tabs>
 
-        {/* Footer : quick actions + delete */}
-        <div
-          className={cn(
-            'shrink-0 space-y-2 border-t px-4 py-3 sm:px-6',
-            editingFiche && 'hidden sm:block',
-          )}
-        >
-          <div className="flex items-center gap-2">
-            <QuickAction
-              icon={Phone}
-              label="Appeler"
-              href={
-                prospect.telephone
-                  ? `tel:${prospect.telephone.replace(/\s/g, '')}`
-                  : null
-              }
-            />
-            <QuickAction
-              icon={Mail}
-              label="Email"
-              href={prospect.email ? `mailto:${prospect.email}` : null}
-            />
-            <QuickAction
-              icon={LinkedinIcon}
-              label="LinkedIn"
-              href={prospect.linkedin}
-            />
+        <div className="shrink-0 space-y-2 border-t px-4 py-3 sm:px-6">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" className="w-full justify-center" />
+                }
+              >
+                <Send className="size-4" />
+                Contacter
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[--anchor-width] min-w-64">
+                <DropdownMenuItem
+                  disabled={!prospect.email}
+                  onClick={() => {
+                    if (prospect.email)
+                      window.open(`mailto:${prospect.email}`, '_blank')
+                  }}
+                >
+                  <Mail className="size-4" />
+                  Email
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!prospect.telephone}
+                  onClick={() => {
+                    if (prospect.telephone)
+                      window.open(
+                        `tel:${prospect.telephone.replace(/\s/g, '')}`,
+                        '_blank',
+                      )
+                  }}
+                >
+                  <Phone className="size-4" />
+                  Téléphone
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!prospect.linkedin}
+                  onClick={() => {
+                    if (prospect.linkedin)
+                      window.open(prospect.linkedin, '_blank')
+                  }}
+                >
+                  <LinkedinIcon className="size-4" />
+                  LinkedIn
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button className="w-full justify-center" />}
+              >
+                <Plus className="size-4" />
+                Enregistrer une action
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[--anchor-width] min-w-64">
+                <DropdownMenuItem
+                  onClick={() => setActionDialog('message_sent')}
+                >
+                  <Send className="size-4" />
+                  Message envoyé
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setActionDialog('message_received')}
+                >
+                  <MessageSquare className="size-4" />
+                  Message reçu
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setActionDialog('meeting')}
+                >
+                  <Handshake className="size-4" />
+                  RDV pris
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActionDialog('won')}>
+                  <CheckCircle2 className="size-4" />
+                  Client gagné
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <Button
             variant="ghost"
@@ -884,22 +864,16 @@ export function ProspectSheet({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <MessageSentDialog
-          open={messageOpen}
-          onOpenChange={setMessageOpen}
-          onSubmit={(channel, texte) => {
-            addComment(`Message ${channel} — ${texte}`)
-            const patch: Partial<Prospect> = {}
-            if (STATUS_RANK[prospect.status] < STATUS_RANK['Contacté']) {
-              patch.status = 'Contacté'
-            }
-            if (!prospect.contactedAt) {
-              patch.contactedAt = todayIso()
-            }
-            if (Object.keys(patch).length > 0) {
-              onChange({ ...prospect, ...patch })
-            }
-            setMessageOpen(false)
+        <ActionDialog
+          open={actionDialog}
+          onOpenChange={setActionDialog}
+          onSubmit={async (payload) => {
+            await logAction(
+              prospect.id,
+              payload.kind,
+              payload.metadata,
+              payload.at,
+            )
           }}
         />
       </SheetContent>

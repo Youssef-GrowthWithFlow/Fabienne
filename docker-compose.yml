@@ -24,6 +24,10 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite-preview}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      DROPCONTACT_API_KEY: ${DROPCONTACT_API_KEY:-}
     volumes:
       - ./backend:/app
       - /app/.venv

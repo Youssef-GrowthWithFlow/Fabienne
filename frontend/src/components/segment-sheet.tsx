@@ -1,5 +1,5 @@
-import { Check, ChevronLeft, Pencil, Trash2, X } from 'lucide-react'
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Check, ChevronLeft, Pencil, Trash2 } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 
 import {
   AlertDialog,
@@ -18,11 +18,16 @@ import { Label } from '@/components/ui/label'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TagsField } from '@/components/tags-field'
 import { Textarea } from '@/components/ui/textarea'
 import { useSegments } from '@/hooks/use-segments'
 import { cn } from '@/lib/utils'
 import type { Segment } from '@/lib/prospects'
-import { type SegmentBrief } from '@/lib/segments'
+import {
+  DATA_SOURCE_OPTIONS,
+  type AISource,
+  type SegmentBrief,
+} from '@/lib/segments'
 
 type InlineTextProps = {
   value: string
@@ -101,124 +106,6 @@ function InlineText({
   )
 }
 
-type TagsFieldProps = {
-  values: string[]
-  onChange: (next: string[]) => void
-  placeholder?: string
-}
-
-function TagsField({ values, onChange, placeholder }: TagsFieldProps) {
-  const [draft, setDraft] = useState('')
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editDraft, setEditDraft] = useState('')
-
-  function add() {
-    const v = draft.trim()
-    if (!v) return
-    if (values.includes(v)) {
-      setDraft('')
-      return
-    }
-    onChange([...values, v])
-    setDraft('')
-  }
-
-  function remove(index: number) {
-    onChange(values.filter((_, i) => i !== index))
-  }
-
-  function startEdit(index: number) {
-    setEditingIndex(index)
-    setEditDraft(values[index])
-  }
-
-  function commitEdit() {
-    if (editingIndex === null) return
-    const v = editDraft.trim()
-    const idx = editingIndex
-    setEditingIndex(null)
-    if (!v) {
-      onChange(values.filter((_, i) => i !== idx))
-      return
-    }
-    if (v === values[idx]) return
-    if (values.some((t, i) => i !== idx && t === v)) {
-      onChange(values.filter((_, i) => i !== idx))
-      return
-    }
-    onChange(values.map((t, i) => (i === idx ? v : t)))
-  }
-
-  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      add()
-    } else if (e.key === 'Backspace' && draft === '' && values.length > 0) {
-      onChange(values.slice(0, -1))
-    }
-  }
-
-  function onEditKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      commitEdit()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      setEditingIndex(null)
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {values.map((tag, index) =>
-        editingIndex === index ? (
-          <Input
-            key={index}
-            autoFocus
-            value={editDraft}
-            onChange={(e) => setEditDraft(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={onEditKeyDown}
-            onFocus={(e) => e.currentTarget.select()}
-            className="h-7 w-auto min-w-[8rem] text-sm"
-          />
-        ) : (
-          <Badge
-            key={index}
-            variant="secondary"
-            className="h-auto max-w-full items-start gap-1 whitespace-normal break-words py-1 font-normal leading-snug"
-          >
-            <button
-              type="button"
-              onClick={() => startEdit(index)}
-              className="cursor-text rounded-sm text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              aria-label={`Modifier ${tag}`}
-            >
-              {tag}
-            </button>
-            <button
-              type="button"
-              onClick={() => remove(index)}
-              className="-mr-1 mt-0.5 shrink-0 rounded-sm p-0.5 hover:bg-muted-foreground/20"
-              aria-label={`Retirer ${tag}`}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ),
-      )}
-      <Input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={onKeyDown}
-        onBlur={add}
-        placeholder={placeholder ?? 'Ajouter…'}
-        className="h-7 w-auto min-w-[10rem] flex-1 text-sm"
-      />
-    </div>
-  )
-}
-
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -292,6 +179,116 @@ function Section({
   )
 }
 
+function AISourcesField({
+  values,
+  onChange,
+}: {
+  values: AISource[]
+  onChange: (next: AISource[]) => void
+}) {
+  function update(index: number, patch: Partial<AISource>) {
+    onChange(values.map((v, i) => (i === index ? { ...v, ...patch } : v)))
+  }
+  function remove(index: number) {
+    onChange(values.filter((_, i) => i !== index))
+  }
+  function add() {
+    onChange([...values, { url: '', description: '' }])
+  }
+  function pruneEmptyOnBlur() {
+    const cleaned = values.filter(
+      (v) => v.url.trim().length > 0 || v.description.trim().length > 0,
+    )
+    if (cleaned.length !== values.length) onChange(cleaned)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {values.map((src, i) => (
+        <div key={i} className="flex items-start gap-2">
+          <Input
+            value={src.url}
+            placeholder="https://…"
+            onChange={(e) => update(i, { url: e.target.value })}
+            onBlur={pruneEmptyOnBlur}
+            className="flex-1"
+          />
+          <Input
+            value={src.description}
+            placeholder="Annuaire officiel, registre…"
+            onChange={(e) => update(i, { description: e.target.value })}
+            onBlur={pruneEmptyOnBlur}
+            className="flex-1"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => remove(i)}
+            aria-label="Retirer cette source"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        onClick={add}
+      >
+        + Ajouter une source
+      </Button>
+    </div>
+  )
+}
+
+
+function DataSourcesField({
+  values,
+  onChange,
+}: {
+  values: string[]
+  onChange: (next: string[]) => void
+}) {
+  function toggle(value: string, checked: boolean) {
+    if (checked) {
+      if (values.includes(value)) return
+      onChange([...values, value])
+    } else {
+      onChange(values.filter((v) => v !== value))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {DATA_SOURCE_OPTIONS.map((opt) => {
+        const checked = values.includes(opt.value)
+        return (
+          <label
+            key={opt.value}
+            className="flex cursor-pointer items-start gap-3 rounded-md border bg-card p-3 hover:bg-muted/40"
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(e) => toggle(opt.value, e.target.checked)}
+              className="mt-0.5 size-4 cursor-pointer accent-foreground"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">{opt.label}</div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {opt.description}
+              </p>
+            </div>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
 type Props = {
   segment: Segment | null
   onClose: () => void
@@ -318,23 +315,44 @@ export function SegmentSheet({ segment, onClose }: Props) {
   }
 
   return (
-    <Sheet open onOpenChange={(o) => !o && onClose()}>
+    <Sheet
+      open
+      modal={false}
+      onOpenChange={(o, details) => {
+        if (o) return
+        if (
+          details?.reason === 'close-press' ||
+          details?.reason === 'escape-key'
+        ) {
+          onClose()
+        }
+      }}
+    >
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="flex !w-full flex-col gap-0 p-0 sm:!max-w-none lg:!w-[60vw]"
       >
-        <div className="flex shrink-0 items-center border-b px-2 py-2 sm:hidden">
-          <Button variant="ghost" size="sm" onClick={onClose}>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2 py-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="gap-1.5"
+          >
             <ChevronLeft className="size-4" />
             Retour
           </Button>
+          <span className="truncate px-2 text-sm font-medium text-muted-foreground">
+            {brief.nom || segment}
+          </span>
         </div>
 
         <Tabs
           defaultValue="cible"
           className="flex min-h-0 flex-1 flex-col gap-0"
         >
-          <div className="border-b px-6 sm:px-10 pt-4 pr-14 pb-2">
+          <div className="border-b px-6 sm:px-10 pt-3 pb-2">
             <TabsList>
               <TabsTrigger value="cible">Cible</TabsTrigger>
               <TabsTrigger value="offre">Offre</TabsTrigger>
@@ -379,21 +397,18 @@ export function SegmentSheet({ segment, onClose }: Props) {
                     placeholder="Ex : 2 à 5 salariés"
                   />
                 </Row>
-                <Row label="Secteur & zone">
-                  <InlineText
-                    value={brief.sousSecteur}
-                    onChange={(v) => set('sousSecteur', v)}
-                    placeholder="Ex : Officines de quartier en France"
+                <Row label="Activité ciblée">
+                  <TagsField
+                    values={brief.activiteCiblee}
+                    onChange={(v) => set('activiteCiblee', v)}
+                    placeholder="Ex : Officine indépendante"
                   />
                 </Row>
-              </Section>
-
-              <Section title="Le bon moment">
-                <Row label="Signaux">
+                <Row label="Zone géographique">
                   <TagsField
-                    values={brief.triggers}
-                    onChange={(v) => set('triggers', v)}
-                    placeholder="Ex : Vient de prendre son poste"
+                    values={brief.zoneGeographique}
+                    onChange={(v) => set('zoneGeographique', v)}
+                    placeholder="Ex : Agglomération toulousaine"
                   />
                 </Row>
               </Section>
@@ -407,20 +422,21 @@ export function SegmentSheet({ segment, onClose }: Props) {
                 </Row>
               </Section>
 
-              <Section title="On y va, ou pas">
-                <Row label="Indispensable">
+              <Section title="Signaux">
+                <Row label="Must have">
                   <TagsField
                     values={brief.mustHave}
                     onChange={(v) => set('mustHave', v)}
+                    placeholder="Ex : Vient de prendre son poste"
                   />
                 </Row>
-                <Row label="Un plus">
+                <Row label="Should have">
                   <TagsField
-                    values={brief.niceToHave}
-                    onChange={(v) => set('niceToHave', v)}
+                    values={brief.shouldHave}
+                    onChange={(v) => set('shouldHave', v)}
                   />
                 </Row>
-                <Row label="Alertes">
+                <Row label="Red flag">
                   <TagsField
                     values={brief.redFlags}
                     onChange={(v) => set('redFlags', v)}
@@ -436,6 +452,24 @@ export function SegmentSheet({ segment, onClose }: Props) {
                     placeholder="Ex : LinkedIn Sales Navigator"
                   />
                 </Row>
+              </Section>
+
+              <Section title="Sources web pour l'IA">
+                <p className="text-xs text-muted-foreground">
+                  URL + description. L'IA peut s'en servir lors du sourcing
+                  (à sa discrétion).
+                </p>
+                <AISourcesField
+                  values={brief.aiSources}
+                  onChange={(v) => set('aiSources', v)}
+                />
+              </Section>
+
+              <Section title="Bases de données externes">
+                <DataSourcesField
+                  values={brief.dataSources}
+                  onChange={(v) => set('dataSources', v)}
+                />
               </Section>
             </div>
           </TabsContent>
@@ -480,6 +514,7 @@ export function SegmentSheet({ segment, onClose }: Props) {
               />
             </div>
           </TabsContent>
+
         </Tabs>
 
         <div className="flex shrink-0 flex-col gap-2 border-t px-6 sm:px-10 py-3">

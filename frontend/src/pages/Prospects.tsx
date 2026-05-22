@@ -1,6 +1,10 @@
 import { Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
+import {
+  CreateProspectDrawer,
+  type CreateProspectInput,
+} from '@/components/create-prospect-drawer'
 import { ProspectSheet } from '@/components/prospect-sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -61,9 +65,11 @@ const PAGE_SIZE = 10
 
 function ProspectCard({
   p,
+  segmentName,
   onClick,
 }: {
   p: Prospect
+  segmentName: string | null
   onClick: () => void
 }) {
   const latest = latestComment(p.comments)
@@ -78,8 +84,8 @@ function ProspectCard({
           <h3 className="truncate text-base font-semibold">{p.nom}</h3>
           <p className="text-muted-foreground truncate text-sm">
             {p.role}
-            {p.role && p.entreprise ? ' · ' : ''}
-            {p.entreprise}
+            {p.role && p.entreprise?.entreprise ? ' · ' : ''}
+            {p.entreprise?.entreprise ?? ''}
           </p>
         </div>
         <Badge variant={statusVariant[p.status]} className="shrink-0">
@@ -87,9 +93,11 @@ function ProspectCard({
         </Badge>
       </header>
 
-      {p.segment ? (
+      {p.entreprise?.segmentId ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{p.segment}</Badge>
+          <Badge variant="secondary">
+            {segmentName ?? p.entreprise.segmentId}
+          </Badge>
         </div>
       ) : null}
 
@@ -169,6 +177,7 @@ export function Prospects() {
     useProspects()
   const { segments, briefs: segmentBriefs } = useSegments()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -177,7 +186,10 @@ export function Prospects() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return prospects.filter((p) => {
-      if (segmentFilter !== 'all' && p.segment !== segmentFilter) {
+      if (
+        segmentFilter !== 'all' &&
+        (p.entreprise?.segmentId ?? null) !== segmentFilter
+      ) {
         return false
       }
       if (statusFilter !== 'all' && p.status !== statusFilter) {
@@ -186,7 +198,7 @@ export function Prospects() {
       if (!q) return true
       return (
         p.nom.toLowerCase().includes(q) ||
-        p.entreprise.toLowerCase().includes(q) ||
+        (p.entreprise?.entreprise ?? '').toLowerCase().includes(q) ||
         p.role.toLowerCase().includes(q) ||
         p.email.toLowerCase().includes(q) ||
         p.telephone.toLowerCase().includes(q) ||
@@ -212,8 +224,9 @@ export function Prospects() {
   const openProspect = (id: string) => setSelectedId(id)
   const closeSheet = () => setSelectedId(null)
 
-  const handleCreate = () => {
-    setSelectedId(createProspect())
+  const handleCreate = async (input: CreateProspectInput) => {
+    const id = await createProspect(input)
+    if (id) setSelectedId(id)
   }
 
   return (
@@ -225,10 +238,19 @@ export function Prospects() {
         </p>
       </div>
 
-      <Button onClick={handleCreate} className="w-full sm:w-fit">
+      <Button
+        onClick={() => setCreateOpen(true)}
+        className="w-full sm:w-fit"
+      >
         <Plus className="size-4" />
         Nouveau prospect
       </Button>
+
+      <CreateProspectDrawer
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreate={handleCreate}
+      />
 
       <div className="flex gap-2 sm:hidden">
         <Select
@@ -364,6 +386,11 @@ export function Prospects() {
               <ProspectCard
                 key={p.id}
                 p={p}
+                segmentName={
+                  p.entreprise?.segmentId
+                    ? segmentBriefs[p.entreprise.segmentId]?.nom ?? null
+                    : null
+                }
                 onClick={() => openProspect(p.id)}
               />
             ))}
@@ -403,13 +430,18 @@ export function Prospects() {
                   <TableCell className="truncate font-medium">
                     {p.nom}
                   </TableCell>
-                  <TableCell className="truncate">{p.entreprise}</TableCell>
+                  <TableCell className="truncate">
+                    {p.entreprise?.entreprise ?? ''}
+                  </TableCell>
                   <TableCell className="text-muted-foreground truncate">
                     {p.role}
                   </TableCell>
                   <TableCell className="overflow-hidden">
-                    {p.segment ? (
-                      <Badge variant="secondary">{p.segment}</Badge>
+                    {p.entreprise?.segmentId ? (
+                      <Badge variant="secondary">
+                        {segmentBriefs[p.entreprise.segmentId]?.nom ??
+                          p.entreprise.segmentId}
+                      </Badge>
                     ) : null}
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-normal">

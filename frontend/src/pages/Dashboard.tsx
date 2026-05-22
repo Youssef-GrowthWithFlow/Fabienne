@@ -19,6 +19,8 @@ import {
   YAxis,
 } from 'recharts'
 
+import { ContactsBar } from '@/components/dashboard/contacts-bar'
+import { SourcingRadial } from '@/components/dashboard/sourcing-radial'
 import { ProspectSheet } from '@/components/prospect-sheet'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -44,14 +46,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useActions } from '@/hooks/use-actions'
 import { useProspects } from '@/hooks/use-prospects'
 import { useSegments } from '@/hooks/use-segments'
+import { useSourcerHistory } from '@/hooks/use-sourcer-history'
 import {
   FUNNEL_STAGES,
   WEEKLY_GOALS,
+  contactedPerDayThisWeek,
   countContactedThisWeek,
   countCreatedThisWeek,
-  detectActivityKind,
   hasReachedRank,
   isThisWeek,
   isRelanceOverdue,
@@ -401,7 +405,7 @@ function OverdueBlock({
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{p.nom}</p>
               <p className="text-muted-foreground truncate text-xs">
-                {p.entreprise}
+                {p.entreprise?.entreprise ?? ""}
               </p>
             </div>
             <span className="text-xs font-medium text-rose-400 tabular-nums dark:text-rose-300">
@@ -476,7 +480,7 @@ function WeekList({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{p.nom}</p>
                       <p className="text-muted-foreground truncate text-xs">
-                        {p.entreprise}
+                        {p.entreprise?.entreprise ?? ""}
                       </p>
                     </div>
                     <Badge
@@ -508,9 +512,11 @@ const ACTIVITY_LABEL: Record<ActivityKind, string> = {
   created: 'Nouveau',
   message: 'Message',
   reply: 'Réponse',
+  discussion: 'Discussion',
   meeting: 'RDV',
   won: 'Client',
-  note: 'Note',
+  lost: 'Refus',
+  no_reply: 'Sans réponse',
 }
 
 const ACTIVITY_BADGE: Record<ActivityKind, string> = {
@@ -520,11 +526,16 @@ const ACTIVITY_BADGE: Record<ActivityKind, string> = {
     'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
   reply:
     'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  discussion:
+    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
   meeting:
     'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300',
   won:
     'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  note: 'bg-muted text-muted-foreground',
+  lost:
+    'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+  no_reply:
+    'bg-muted text-muted-foreground',
 }
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
@@ -546,33 +557,24 @@ function ActivityTracker({
     items: ActivityItem[]
   } | null>(null)
 
+  const { actions } = useActions()
+
   const activitiesByDay = useMemo(() => {
     const map = new Map<string, ActivityItem[]>()
-    const push = (a: ActivityItem) => {
-      const list = map.get(a.iso) ?? []
-      list.push(a)
-      map.set(a.iso, list)
-    }
-    for (const p of prospects) {
-      if (p.createdAt)
-        push({
-          type: 'created',
-          iso: p.createdAt.slice(0, 10),
-          prospectId: p.id,
-          prospect: p.nom || 'Sans nom',
-        })
-      for (const c of p.comments) {
-        push({
-          type: detectActivityKind(c.texte),
-          iso: c.date.slice(0, 10),
-          prospectId: p.id,
-          prospect: p.nom || 'Sans nom',
-          texte: c.texte,
-        })
-      }
+    const byId = new Map(prospects.map((p) => [p.id, p]))
+    for (const a of actions) {
+      const iso = a.at.slice(0, 10)
+      const list = map.get(iso) ?? []
+      list.push({
+        type: a.kind,
+        iso,
+        prospectId: a.prospectId,
+        prospect: byId.get(a.prospectId)?.nom || 'Sans nom',
+      })
+      map.set(iso, list)
     }
     return map
-  }, [prospects])
+  }, [actions, prospects])
 
   const { days, total, weekStart, weekItems, rangeLabel } = useMemo(() => {
     const today = new Date()
@@ -916,18 +918,18 @@ function KanbanBoard({
                       <span className="truncate text-sm font-medium">
                         {p.nom || 'Sans nom'}
                       </span>
-                      {p.entreprise ? (
+                      {p.entreprise?.entreprise ? (
                         <span className="text-muted-foreground truncate text-xs">
-                          {p.entreprise}
+                          {p.entreprise.entreprise}
                         </span>
                       ) : null}
                       <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                        {p.segment ? (
+                        {p.entreprise?.segmentId ? (
                           <Badge
                             variant="secondary"
                             className="px-1.5 py-0 text-[10px] font-normal"
                           >
-                            {p.segment}
+                            {p.entreprise.segmentId}
                           </Badge>
                         ) : null}
                         {p.relanceDate ? (
@@ -1118,7 +1120,7 @@ function FunnelStageSheet({
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{p.nom}</p>
                         <p className="text-muted-foreground truncate text-xs">
-                          {p.entreprise}
+                          {p.entreprise?.entreprise ?? ""}
                         </p>
                       </div>
                       <Badge
@@ -1152,7 +1154,7 @@ function FunnelStageSheet({
                       >
                         <TableCell className="font-medium">{p.nom}</TableCell>
                         <TableCell className="text-muted-foreground">
-                          {p.entreprise}
+                          {p.entreprise?.entreprise ?? ""}
                         </TableCell>
                         <TableCell className="text-right">
                           <Badge variant={statusVariant[p.status]}>
@@ -1195,7 +1197,8 @@ function ActivityStats({
           })()
     return {
       list: prospects.filter((p) => {
-        if (segment !== 'all' && p.segment !== segment) return false
+        if (segment !== 'all' && (p.entreprise?.segmentId ?? null) !== segment)
+          return false
         if (start) {
           const d = new Date(p.createdAt)
           if (Number.isNaN(d.getTime()) || d < start) return false
@@ -1267,10 +1270,30 @@ function ActivityStats({
 
 export function Dashboard() {
   const { prospects, loading, getProspect, updateProspect } = useProspects()
+  const { candidates: sourcerCandidates } = useSourcerHistory()
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const created = countCreatedThisWeek(prospects)
   const contacted = countContactedThisWeek(prospects)
+
+  // Sourcing : tout candidat sourcé cette semaine (peu importe le statut)
+  // vs validés (status = 'validated'). On compte les SourcedCandidate
+  // récupérés depuis l'API sourcer.
+  const sourcedThisWeek = useMemo(
+    () => sourcerCandidates.filter((c) => isThisWeek(c.createdAt)).length,
+    [sourcerCandidates],
+  )
+  const validatedThisWeek = useMemo(
+    () =>
+      sourcerCandidates.filter(
+        (c) => c.status === 'validated' && isThisWeek(c.createdAt),
+      ).length,
+    [sourcerCandidates],
+  )
+  const contactsPerDay = useMemo(
+    () => contactedPerDayThisWeek(prospects),
+    [prospects],
+  )
   const createdActions = useMemo<GoalAction[]>(
     () =>
       prospects
@@ -1278,7 +1301,7 @@ export function Dashboard() {
         .map((p) => ({
           id: p.id,
           nom: p.nom || 'Sans nom',
-          entreprise: p.entreprise,
+          entreprise: p.entreprise?.entreprise ?? '',
           date: p.createdAt,
         }))
         .sort((a, b) => (a.date < b.date ? 1 : -1)),
@@ -1291,7 +1314,7 @@ export function Dashboard() {
         .map((p) => ({
           id: p.id,
           nom: p.nom || 'Sans nom',
-          entreprise: p.entreprise,
+          entreprise: p.entreprise?.entreprise ?? '',
           date: p.contactedAt!,
         }))
         .sort((a, b) => (a.date < b.date ? 1 : -1)),
@@ -1328,33 +1351,24 @@ export function Dashboard() {
         <h3 className="text-lg font-semibold tracking-tight">
           Objectifs hebdo
         </h3>
-        <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           {loading ? (
             <>
-              <Skeleton className="h-64 rounded-xl" />
-              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-72 rounded-xl" />
+              <Skeleton className="h-72 rounded-xl" />
             </>
           ) : (
             <>
-              <GoalRadial
-                title="Nouveaux prospects"
-                description="générés cette semaine"
-                value={created}
-                target={WEEKLY_GOALS.newProspects}
-                actions={createdActions}
-                color="#10b981"
-                configKey="created"
-                onOpenProspect={openProspect}
+              <SourcingRadial
+                sourced={sourcedThisWeek}
+                sourcedTarget={WEEKLY_GOALS.sourcedLeads}
+                validated={validatedThisWeek}
+                validatedTarget={WEEKLY_GOALS.validatedLeads}
               />
-              <GoalRadial
-                title="Prospects contactés"
-                description="contactés cette semaine"
-                value={contacted}
+              <ContactsBar
+                perDay={contactsPerDay}
+                total={contacted}
                 target={WEEKLY_GOALS.contactedProspects}
-                actions={contactedActions}
-                color="#047857"
-                configKey="contacted"
-                onOpenProspect={openProspect}
               />
             </>
           )}

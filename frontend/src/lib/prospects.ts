@@ -78,47 +78,43 @@ export type Comment = {
   id: string
   date: string
   texte: string
+  actionId?: string | null
 }
 
 export type ActivityKind =
   | 'created'
   | 'message'
   | 'reply'
+  | 'discussion'
   | 'meeting'
   | 'won'
-  | 'note'
+  | 'lost'
+  | 'no_reply'
 
-export const ACTIVITY_PREFIX: Record<
-  Exclude<ActivityKind, 'created' | 'note'>,
-  string
-> = {
-  message: 'Message',
-  reply: 'Réponse',
-  meeting: 'RDV',
-  won: 'Client',
+export type EntrepriseSummary = {
+  id: string
+  entreprise: string
+  siteWeb: string
+  ville: string
+  segmentId: Segment | null
+  ficheClient: string
+  signaux: string[]
 }
 
-export function detectActivityKind(texte: string): ActivityKind {
-  const t = texte.trim()
-  if (t.startsWith(ACTIVITY_PREFIX.message)) return 'message'
-  if (t.startsWith(ACTIVITY_PREFIX.reply)) return 'reply'
-  if (t.startsWith(ACTIVITY_PREFIX.meeting)) return 'meeting'
-  if (t.startsWith(ACTIVITY_PREFIX.won)) return 'won'
-  return 'note'
-}
+export type { FieldSource } from '@/lib/entreprises'
+import type { FieldSource } from '@/lib/entreprises'
 
 export type Prospect = {
   id: string
   nom: string
-  entreprise: string
   role: string
-  segment: Segment | null
+  entrepriseId: string | null
+  entreprise: EntrepriseSummary | null
   status: ProspectStatus
   email: string
   telephone: string
   linkedin: string | null
-  website: string | null
-  ficheClient: string
+  fieldSources: Record<string, FieldSource>
   comments: Comment[]
   createdAt: string
   contactedAt: string | null
@@ -128,6 +124,8 @@ export type Prospect = {
 export const WEEKLY_GOALS = {
   newProspects: 10,
   contactedProspects: 10,
+  sourcedLeads: 50,
+  validatedLeads: 10,
 } as const
 
 function toDate(iso: string): Date {
@@ -160,6 +158,25 @@ export function countContactedThisWeek(list: Prospect[]): number {
   return list.filter((p) => p.contactedAt && isThisWeek(p.contactedAt)).length
 }
 
+const WEEK_LABELS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] as const
+
+/** Group prospects with a `contactedAt` falling in the current week by weekday,
+ *  Mon→Sun. Returns 7 entries even if some days are empty. */
+export function contactedPerDayThisWeek(
+  list: Prospect[],
+  ref: Date = new Date(),
+): { day: string; count: number }[] {
+  const start = startOfWeek(ref)
+  const counts = [0, 0, 0, 0, 0, 0, 0]
+  for (const p of list) {
+    if (!p.contactedAt || !isThisWeek(p.contactedAt, ref)) continue
+    const d = toDate(p.contactedAt)
+    const idx = Math.floor((d.getTime() - start.getTime()) / 86_400_000)
+    if (idx >= 0 && idx < 7) counts[idx] += 1
+  }
+  return WEEK_LABELS_FR.map((day, i) => ({ day, count: counts[i] }))
+}
+
 export function isRelanceOverdue(iso: string, ref: Date = new Date()): boolean {
   const d = toDate(iso)
   if (Number.isNaN(d.getTime())) return false
@@ -177,17 +194,6 @@ export function relancesDues(list: Prospect[]): Prospect[] {
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
-
-export const FICHE_CLIENT_TEMPLATE = `
-<h2>Contexte / Découverte</h2>
-<p></p>
-<h2>Besoins / Pain points</h2>
-<p></p>
-<h2>Décideurs & parties prenantes</h2>
-<p></p>
-<h2>Historique & prochaines étapes</h2>
-<p></p>
-`.trim()
 
 export function newId(prefix = ''): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -218,160 +224,3 @@ export function latestComment(list: Comment[]): Comment | undefined {
   return max
 }
 
-export const initialProspects: Prospect[] = [
-  {
-    id: '1',
-    nom: 'Emilie Genieys',
-    entreprise: 'Pharmacie Genieys',
-    role: 'Pharmacien titulaire',
-    segment: 'Pharmacie',
-    status: 'À contacter',
-    email: 'pharmacie.gratentour@gmail.com',
-    telephone: '05 61 82 37 64',
-    linkedin: null,
-    website: null,
-    ficheClient: FICHE_CLIENT_TEMPLATE,
-    comments: [
-      {
-        id: 'c1',
-        date: '2026-05-13',
-        texte: 'Reprise très récente (avril 2026)',
-      },
-    ],
-    createdAt: '2026-05-12',
-    contactedAt: null,
-    relanceDate: '2026-05-16',
-  },
-  {
-    id: '2',
-    nom: 'Julien Marchand',
-    entreprise: 'Startup Nimbus',
-    role: 'CEO',
-    segment: 'Startup',
-    status: 'Contacté',
-    email: 'julien@nimbus.io',
-    telephone: '06 12 34 56 78',
-    linkedin: 'https://linkedin.com/in/julienmarchand',
-    website: 'https://nimbus.io',
-    ficheClient: FICHE_CLIENT_TEMPLATE,
-    comments: [
-      {
-        id: 'c2',
-        date: '2026-05-12',
-        texte: 'Premier email envoyé, attente retour',
-      },
-    ],
-    createdAt: '2026-05-11',
-    contactedAt: '2026-05-12',
-    relanceDate: '2026-05-14',
-  },
-  {
-    id: '3',
-    nom: 'Sophie Dubois',
-    entreprise: 'Mairie de Saint-Jean',
-    role: 'Responsable achats',
-    segment: 'Collectivité',
-    status: 'Sans réponse',
-    email: 'sophie.dubois@stjean.fr',
-    telephone: '05 34 12 78 90',
-    linkedin: null,
-    website: null,
-    ficheClient: FICHE_CLIENT_TEMPLATE,
-    comments: [
-      {
-        id: 'c3',
-        date: '2026-05-02',
-        texte: 'Relance 1 envoyée',
-      },
-    ],
-    createdAt: '2026-04-20',
-    contactedAt: '2026-04-25',
-    relanceDate: '2026-05-10',
-  },
-  {
-    id: '5',
-    nom: 'Anaïs Lefèvre',
-    entreprise: 'Pharmacie de la Place',
-    role: 'Pharmacien titulaire',
-    segment: 'Pharmacie',
-    status: 'RDV',
-    email: 'a.lefevre@pharm-place.fr',
-    telephone: '04 22 11 33 44',
-    linkedin: null,
-    website: null,
-    ficheClient: FICHE_CLIENT_TEMPLATE,
-    comments: [
-      {
-        id: 'c5',
-        date: '2026-05-09',
-        texte: 'RDV confirmé pour le 22 mai',
-      },
-    ],
-    createdAt: '2026-04-15',
-    contactedAt: '2026-04-18',
-    relanceDate: null,
-  },
-  {
-    id: '6',
-    nom: 'Thomas Renaud',
-    entreprise: 'CleanCity SaaS',
-    role: 'COO',
-    segment: 'Startup',
-    status: 'Client',
-    email: 'thomas@cleancity.io',
-    telephone: '06 99 88 77 66',
-    linkedin: 'https://linkedin.com/in/thomasrenaud',
-    website: 'https://cleancity.io',
-    ficheClient: FICHE_CLIENT_TEMPLATE,
-    comments: [
-      {
-        id: 'c6',
-        date: '2026-05-05',
-        texte: 'Contrat signé',
-      },
-    ],
-    createdAt: '2026-03-20',
-    contactedAt: '2026-03-22',
-    relanceDate: null,
-  },
-  {
-    id: '7',
-    nom: 'Léa Marin',
-    entreprise: 'Mairie de Frouzins',
-    role: 'DGS',
-    segment: 'Collectivité',
-    status: 'Répondu',
-    email: 'lea.marin@frouzins.fr',
-    telephone: '05 61 78 90 12',
-    linkedin: null,
-    website: null,
-    ficheClient: FICHE_CLIENT_TEMPLATE,
-    comments: [
-      {
-        id: 'c7',
-        date: '2026-05-12',
-        texte: 'Intéressée, attend devis',
-      },
-    ],
-    createdAt: '2026-05-04',
-    contactedAt: '2026-05-06',
-    relanceDate: '2026-05-19',
-  },
-  {
-    id: '4',
-    nom: 'Karim Belkacem',
-    entreprise: 'Pharmacie du Centre',
-    role: 'Pharmacien titulaire',
-    segment: 'Pharmacie',
-    status: 'En discussion',
-    email: 'k.belkacem@pharmacie-centre.fr',
-    telephone: '04 56 78 90 12',
-    linkedin: null,
-    website: null,
-    ficheClient: FICHE_CLIENT_TEMPLATE,
-    comments: [],
-    createdAt: '2026-05-13',
-    contactedAt: '2026-05-13',
-    relanceDate: '2026-05-20',
-  },
-]

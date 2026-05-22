@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 
+import { CreateSegmentDialog } from '@/components/create-segment-dialog'
 import { SegmentSheet } from '@/components/segment-sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,9 +13,11 @@ const MAX_PREVIEW_TAGS = 4
 export function Segments() {
   const { segments, getBrief, addSegment } = useSegments()
   const [openSegment, setOpenSegment] = useState<Segment | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
 
-  const handleCreate = () => {
-    setOpenSegment(addSegment())
+  const handleCreate = async (input: { nom: string; description: string }) => {
+    const id = await addSegment(input)
+    if (id) setOpenSegment(id)
   }
 
   return (
@@ -26,10 +29,19 @@ export function Segments() {
         </p>
       </div>
 
-      <Button onClick={handleCreate} className="w-full sm:w-fit">
+      <Button
+        onClick={() => setCreateOpen(true)}
+        className="w-full sm:w-fit"
+      >
         <Plus className="size-4" />
         Nouveau segment
       </Button>
+
+      <CreateSegmentDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreate={handleCreate}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {segments.map((segment) => {

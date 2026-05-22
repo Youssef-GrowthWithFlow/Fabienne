@@ -2,34 +2,68 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
 import { toast } from 'sonner'
 
-import { INITIAL_SEGMENT_IDS, newId, type Segment } from '@/lib/prospects'
+import { type Segment } from '@/lib/prospects'
 import {
-  EMPTY_SEGMENT_BRIEF,
-  INITIAL_BRIEFS,
-  type SegmentBrief,
-} from '@/lib/segments'
+  createSegment as apiCreateSegment,
+  deleteSegment as apiDeleteSegment,
+  listSegments as apiListSegments,
+  updateSegment as apiUpdateSegment,
+  type SegmentRecord,
+} from '@/lib/segments-api'
+import { EMPTY_SEGMENT_BRIEF, type SegmentBrief } from '@/lib/segments'
 
 type SegmentsContextValue = {
   segments: Segment[]
   briefs: Record<Segment, SegmentBrief>
+  loading: boolean
   getBrief: (segment: Segment) => SegmentBrief
   updateBrief: (segment: Segment, next: SegmentBrief) => void
-  addSegment: () => Segment
+  addSegment: (input?: Partial<SegmentBrief>) => Promise<Segment | null>
   deleteSegment: (segment: Segment) => void
 }
 
 const SegmentsContext = createContext<SegmentsContextValue | null>(null)
 
+function toBrief(record: SegmentRecord): SegmentBrief {
+  const { id: _id, ...brief } = record
+  return brief
+}
+
 export function SegmentsProvider({ children }: { children: ReactNode }) {
-  const [segments, setSegments] = useState<Segment[]>(INITIAL_SEGMENT_IDS)
-  const [briefs, setBriefs] =
-    useState<Record<Segment, SegmentBrief>>(INITIAL_BRIEFS)
+  const [records, setRecords] = useState<SegmentRecord[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    apiListSegments()
+      .then((data) => {
+        if (!cancelled) setRecords(data)
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Impossible de charger les segments')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const segments = useMemo<Segment[]>(() => records.map((r) => r.id), [records])
+
+  const briefs = useMemo<Record<Segment, SegmentBrief>>(() => {
+    const map: Record<Segment, SegmentBrief> = {}
+    for (const r of records) map[r.id] = toBrief(r)
+    return map
+  }, [records])
 
   const getBrief = useCallback(
     (segment: Segment) => briefs[segment] ?? EMPTY_SEGMENT_BRIEF,
@@ -38,41 +72,77 @@ export function SegmentsProvider({ children }: { children: ReactNode }) {
 
   const updateBrief = useCallback(
     (segment: Segment, next: SegmentBrief) => {
-      setBriefs((prev) => ({ ...prev, [segment]: next }))
+      let prev: SegmentRecord | undefined
+      setRecords((rs) => {
+        prev = rs.find((r) => r.id === segment)
+        return rs.map((r) => (r.id === segment ? { ...r, ...next } : r))
+      })
+      apiUpdateSegment(segment, next)
+        .then((updated) => {
+          setRecords((rs) => rs.map((r) => (r.id === segment ? updated : r)))
+        })
+        .catch(() => {
+          toast.error('Échec de la mise à jour')
+          if (prev) {
+            const snapshot = prev
+            setRecords((rs) =>
+              rs.map((r) => (r.id === segment ? snapshot : r)),
+            )
+          }
+        })
     },
     [],
   )
 
-  const addSegment = useCallback(() => {
-    const id = newId('seg')
-    setBriefs((prev) => ({
-      ...prev,
-      [id]: { ...EMPTY_SEGMENT_BRIEF, nom: 'Nouveau segment' },
-    }))
-    setSegments((prev) => [id, ...prev])
-    toast.success('Segment créé')
-    return id
-  }, [])
+  const addSegment = useCallback(
+    async (input?: Partial<SegmentBrief>): Promise<Segment | null> => {
+      try {
+        const created = await apiCreateSegment({
+          ...EMPTY_SEGMENT_BRIEF,
+          nom: 'Nouveau segment',
+          ...input,
+        })
+        setRecords((rs) => [created, ...rs])
+        toast.success('Segment créé')
+        return created.id
+      } catch {
+        toast.error('Échec de la création')
+        return null
+      }
+    },
+    [],
+  )
 
-  const deleteSegment = useCallback((segment: Segment) => {
-    setSegments((prev) => prev.filter((s) => s !== segment))
-    setBriefs((prev) => {
-      const { [segment]: _, ...rest } = prev
-      return rest
-    })
-    toast.success('Segment supprimé')
-  }, [])
+  const deleteSegment = useCallback(
+    (segment: Segment) => {
+      let prev: SegmentRecord[] = []
+      setRecords((rs) => {
+        prev = rs
+        return rs.filter((r) => r.id !== segment)
+      })
+      apiDeleteSegment(segment)
+        .then(() => {
+          toast.success('Segment supprimé')
+        })
+        .catch(() => {
+          toast.error('Échec de la suppression')
+          setRecords(prev)
+        })
+    },
+    [],
+  )
 
   const value = useMemo<SegmentsContextValue>(
     () => ({
       segments,
       briefs,
+      loading,
       getBrief,
       updateBrief,
       addSegment,
       deleteSegment,
     }),
-    [segments, briefs, getBrief, updateBrief, addSegment, deleteSegment],
+    [segments, briefs, loading, getBrief, updateBrief, addSegment, deleteSegment],
   )
 
   return (
