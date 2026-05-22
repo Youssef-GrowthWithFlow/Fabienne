@@ -1,3 +1,13 @@
+# Production-grade compose used for BOTH prod and preprod.
+# Differentiation is done via env vars passed at deploy time:
+#   COMPOSE_PROJECT_NAME=fabienne-prod | fabienne-preprod
+#   FABIENNE_HOST=fabienne.growthwithflow.com | fabienne-preprod.growthwithflow.com
+#   FABIENNE_ROUTER=fabienne-prod | fabienne-preprod   (must be unique across the Traefik instance)
+#
+# The host's Traefik (from the n8n stack) discovers services via the shared
+# external network `n8n_default` and the labels below. TLS certs are issued
+# automatically by the `mytlschallenge` resolver already configured on Traefik.
+
 services:
   db:
     image: postgres:16-alpine
@@ -8,6 +18,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -20,19 +32,37 @@ services:
       dockerfile: Dockerfile.prod
     restart: unless-stopped
     env_file: .env
+    networks:
+      - internal
     depends_on:
       db:
         condition: service_healthy
 
   nginx:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
+      context: .
+      dockerfile: frontend/Dockerfile.prod
     restart: unless-stopped
-    ports:
-      - "80:80"
+    networks:
+      - internal
+      - traefik
     depends_on:
       - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=n8n_default"
+      - "traefik.http.routers.${FABIENNE_ROUTER}.rule=Host(`${FABIENNE_HOST}`)"
+      - "traefik.http.routers.${FABIENNE_ROUTER}.entrypoints=websecure"
+      - "traefik.http.routers.${FABIENNE_ROUTER}.tls=true"
+      - "traefik.http.routers.${FABIENNE_ROUTER}.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.${FABIENNE_ROUTER}.loadbalancer.server.port=80"
+
+networks:
+  internal:
+    driver: bridge
+  traefik:
+    name: n8n_default
+    external: true
 
 volumes:
   postgres_data:
