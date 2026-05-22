@@ -22,7 +22,7 @@ INSERT INTO segments (
     data_sources, ai_sources, notes
 ) VALUES (
     'startup1',
-    'Startup en croissance',
+    'Startup',
     'Startups françaises en phase de structuration ou post-levée. L''équipe grandit vite, le dirigeant doit installer une gouvernance, professionnaliser le management et embarquer les équipes dans le changement.',
     '20 à 200 salariés',
     'Accompagnement stratégique du dirigeant et de ses équipes : structuration de la gouvernance, mise en place d''un CODIR opérationnel, professionnalisation des pratiques managériales et activation de l''engagement collectif.',
@@ -195,7 +195,7 @@ INSERT INTO segments (
     data_sources, ai_sources, notes
 ) VALUES (
     'pharma01',
-    'Pharmacie en transition',
+    'Pharmacie',
     'Pharmacies d''officine indépendantes en phase de rachat, transmission ou changement de titulaire. Petites équipes en transition, prise de poste à structurer et cohésion d''équipe à reconstruire dans un cadre humain délicat.',
     '3 à 15 salariés',
     'Accompagnement du nouveau titulaire et de son équipe en sortie de rachat ou de transmission : prise de poste, cohésion d''équipe, transmission douce de la patientèle, gestion du changement.',
