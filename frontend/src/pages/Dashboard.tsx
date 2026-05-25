@@ -417,7 +417,10 @@ function ActivityTracker({
                   const parts = breakdown
                     ? (Object.entries(breakdown) as [ActivityKind, number][])
                         .filter(([, n]) => n > 0)
-                        .map(([k, n]) => `${n} ${ACTIVITY_LABEL[k].toLowerCase()}`)
+                        .map(
+                          ([k, n]) =>
+                            `${n} ${(ACTIVITY_LABEL[k] ?? k).toLowerCase()}`,
+                        )
                     : []
                   return (
                     <div className="flex flex-col gap-0.5">
@@ -609,7 +612,16 @@ function KanbanBoard({
       'Sans réponse': [],
       Refus: [],
     }
-    for (const p of prospects) map[p.status].push(p)
+    for (const p of prospects) {
+      const bucket = map[p.status]
+      if (bucket) bucket.push(p)
+      else
+        console.warn(
+          '[KanbanBoard] unknown status, skipping prospect',
+          p.id,
+          p.status,
+        )
+    }
     return map
   }, [prospects])
 
