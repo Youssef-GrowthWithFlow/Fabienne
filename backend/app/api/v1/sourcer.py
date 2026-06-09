@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
+from app.api.v1._helpers import get_or_404
 from app.core.database import AsyncSessionLocal, get_db
 from app.models.entreprise import Entreprise
 from app.models.enums import FIELD_SOURCES
@@ -110,38 +111,6 @@ async def _persist_run(
     for row in persisted:
         await db.refresh(row)
     return persisted
-
-
-@router.post(
-    "/run",
-    response_model=SourcerRunResponse,
-    response_model_by_alias=True,
-)
-async def run_sourcing(
-    payload: SourcerRunRequest,
-    db: AsyncSession = Depends(get_db),
-) -> SourcerRunResponse:
-    segment = None
-    if payload.segment_id:
-        segment = await db.get(Segment, payload.segment_id)
-        if segment is None:
-            raise HTTPException(status_code=404, detail="Segment not found")
-    try:
-        result = await generate_entreprises(
-            db, segment, payload.instruction, payload.count
-        )
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
-        ) from exc
-
-    persisted = await _persist_run(
-        db, payload.segment_id, payload.instruction, result.candidates,
-    )
-    return SourcerRunResponse(
-        candidates=[SourcedCandidateRead.model_validate(r) for r in persisted],
-        search_queries=result.search_queries,
-    )
 
 
 @router.post("/run/stream")
@@ -246,13 +215,6 @@ async def run_sourcing_stream(
 # ---------------------------------------------------------------------------
 
 
-async def _get_or_404(db: AsyncSession, candidate_id: str) -> SourcedCandidate:
-    obj = await db.get(SourcedCandidate, candidate_id)
-    if obj is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
-    return obj
-
-
 @router.patch(
     "/candidates/{candidate_id}",
     response_model=SourcedCandidateRead,
@@ -263,7 +225,7 @@ async def update_candidate(
     patch: SourcedCandidateUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> SourcedCandidate:
-    obj = await _get_or_404(db, candidate_id)
+    obj = await get_or_404(db, SourcedCandidate, candidate_id, label="Candidate")
     if patch.main_contact_index is not None:
         obj.main_contact_index = max(0, patch.main_contact_index)
     await db.commit()
@@ -280,7 +242,7 @@ async def refuse_candidate(
     candidate_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> SourcedCandidate:
-    obj = await _get_or_404(db, candidate_id)
+    obj = await get_or_404(db, SourcedCandidate, candidate_id, label="Candidate")
     obj.status = "refused"
     await db.commit()
     await db.refresh(obj)
@@ -292,7 +254,7 @@ async def validate_candidate(
     candidate_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    obj = await _get_or_404(db, candidate_id)
+    obj = await get_or_404(db, SourcedCandidate, candidate_id, label="Candidate")
     if obj.status == "validated" and obj.entreprise_id:
         # Idempotent — return the existing entreprise/prospect.
         ent = await db.get(Entreprise, obj.entreprise_id)

@@ -2,8 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
-@import "@assistant-ui/react-ui/styles/index.css";
-@import "@assistant-ui/react-ui/styles/themes/default.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -130,23 +128,3 @@
   }
 }
 
-/* Agent editor (Tiptap) — placeholder + mention pills */
-.agent-editor p {
-  margin: 0;
-}
-.agent-editor p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  color: var(--muted-foreground);
-  float: left;
-  pointer-events: none;
-  height: 0;
-}
-.agent-mention-pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 0.25rem;
-  padding: 0 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-}

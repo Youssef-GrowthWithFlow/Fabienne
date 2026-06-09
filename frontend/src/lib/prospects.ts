@@ -61,11 +61,6 @@ export const statusVariant: Record<
 }
 
 export type Segment = string
-export const INITIAL_SEGMENT_IDS: Segment[] = [
-  'Pharmacie',
-  'Startup',
-  'Collectivité',
-]
 export type SegmentFilter = 'all' | Segment
 
 export type StatusFilter = 'all' | ProspectStatus
@@ -91,18 +86,8 @@ export type ActivityKind =
   | 'lost'
   | 'no_reply'
 
-export type EntrepriseSummary = {
-  id: string
-  entreprise: string
-  siteWeb: string
-  ville: string
-  segmentId: Segment | null
-  ficheClient: string
-  signaux: string[]
-}
-
-export type { FieldSource } from '@/lib/entreprises'
-import type { FieldSource } from '@/lib/entreprises'
+export type { EntrepriseSummary, FieldSource } from '@/lib/entreprises'
+import type { EntrepriseSummary, FieldSource } from '@/lib/entreprises'
 
 export type Prospect = {
   id: string
@@ -193,13 +178,6 @@ export function relancesDues(list: Prospect[]): Prospect[] {
 
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
-}
-
-export function newId(prefix = ''): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `${prefix}${Date.now()}${Math.random().toString(36).slice(2, 8)}`
 }
 
 export function formatDate(iso: string): string {

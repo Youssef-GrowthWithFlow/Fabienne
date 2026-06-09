@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,9 +10,9 @@ type Props = {
   placeholder?: string
   multiline?: boolean
   type?: 'text' | 'email' | 'tel' | 'url'
-  rows?: number
   className?: string
   displayClassName?: string
+  emptyLabel?: string
 }
 
 export function InlineText({
@@ -21,9 +21,9 @@ export function InlineText({
   placeholder,
   multiline = false,
   type = 'text',
-  rows = 3,
   className,
   displayClassName,
+  emptyLabel = 'Ajouter…',
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -44,7 +44,7 @@ export function InlineText({
           onKeyDown={(e) => {
             if (e.key === 'Escape') setEditing(false)
           }}
-          rows={rows}
+          rows={3}
           className={cn('resize-y text-sm', className)}
           placeholder={placeholder}
         />
@@ -58,7 +58,7 @@ export function InlineText({
         onChange={(e) => setDraft(e.target.value)}
         onFocus={(e) => e.currentTarget.select()}
         onBlur={commit}
-        onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+        onKeyDown={(e) => {
           if (e.key === 'Enter') commit()
           else if (e.key === 'Escape') setEditing(false)
         }}
@@ -76,13 +76,12 @@ export function InlineText({
         setEditing(true)
       }}
       className={cn(
-        'block w-full rounded px-2 py-1 text-left text-sm hover:bg-muted/50',
-        multiline && 'whitespace-pre-wrap',
+        'rounded-sm text-left text-sm hover:bg-muted/60',
         !value && 'italic text-muted-foreground',
         displayClassName,
       )}
     >
-      {value || placeholder || 'Ajouter…'}
+      {value || placeholder || emptyLabel}
     </button>
   )
 }

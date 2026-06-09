@@ -1,14 +1,8 @@
-"""Shared Gemini helpers: client, response parsers, segment formatter.
-
-Public surface used by enrichment, sourcer, and the chat dispatcher / agents.
-"""
+"""Shared Gemini helpers: client, response parsers, segment formatter."""
 from __future__ import annotations
 
-import json
 import logging
-import re
 from functools import lru_cache
-from typing import Any
 
 from google import genai
 
@@ -25,100 +19,6 @@ def get_client() -> genai.Client:
             "GEMINI_API_KEY is not configured. Set it in the backend environment."
         )
     return genai.Client(api_key=settings.GEMINI_API_KEY)
-
-
-# ---------------------------------------------------------------------------
-# JSON extraction
-# ---------------------------------------------------------------------------
-
-_JSON_FENCE_OBJECT = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
-_JSON_FENCE_ARRAY = re.compile(r"```(?:json)?\s*(\[.*?\])\s*```", re.DOTALL)
-
-
-def _slice_balanced(text: str, open_ch: str, close_ch: str) -> str | None:
-    """Return the first balanced `open_ch ... close_ch` slice, respecting strings."""
-    start = text.find(open_ch)
-    if start < 0:
-        return None
-    depth = 0
-    in_str = False
-    escape = False
-    for i in range(start, len(text)):
-        c = text[i]
-        if in_str:
-            if escape:
-                escape = False
-            elif c == "\\":
-                escape = True
-            elif c == '"':
-                in_str = False
-            continue
-        if c == '"':
-            in_str = True
-        elif c == open_ch:
-            depth += 1
-        elif c == close_ch:
-            depth -= 1
-            if depth == 0:
-                return text[start : i + 1]
-    return None
-
-
-def extract_json_object(text: str) -> Any:
-    """Parse the first JSON object or array found in `text`.
-
-    Tolerant to ```json fenced blocks, bare blocks, top-level arrays,
-    nested arrays/objects within values.
-    """
-    if not text:
-        return None
-
-    candidates: list[str] = []
-    m = _JSON_FENCE_OBJECT.search(text)
-    if m:
-        candidates.append(m.group(1))
-    m = _JSON_FENCE_ARRAY.search(text)
-    if m:
-        candidates.append(m.group(1))
-
-    obj_slice = _slice_balanced(text, "{", "}")
-    if obj_slice:
-        candidates.append(obj_slice)
-    arr_slice = _slice_balanced(text, "[", "]")
-    if arr_slice:
-        candidates.append(arr_slice)
-
-    for raw in candidates:
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-
-    logger.warning("Gemini response did not yield parseable JSON: %r", text[:600])
-    return None
-
-
-def extract_json(text: str) -> dict[str, str]:
-    """Parse JSON and flatten all values to strings (legacy use)."""
-    parsed = extract_json_object(text)
-    if not isinstance(parsed, dict):
-        return {}
-    out: dict[str, str] = {}
-    for k, v in parsed.items():
-        if isinstance(v, str):
-            out[str(k)] = v.strip()
-        elif isinstance(v, (int, float)):
-            out[str(k)] = str(v)
-        elif isinstance(v, list):
-            out[str(k)] = ", ".join(str(x).strip() for x in v if str(x).strip())
-        else:
-            out[str(k)] = ""
-    return out
-
-
-# ---------------------------------------------------------------------------
-# Grounding metadata
-# ---------------------------------------------------------------------------
 
 
 def extract_sources(response) -> tuple[list[GroundingSource], list[str]]:

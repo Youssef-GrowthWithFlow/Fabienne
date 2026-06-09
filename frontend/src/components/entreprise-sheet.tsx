@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 import { RichTextEditor } from '@/components/rich-text-editor'
+import { SignalBadge } from '@/components/signal-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -304,13 +305,7 @@ export function EntrepriseSheet({ entreprise: ent, onClose }: Props) {
               <Field label="Signaux">
                 <div className="flex flex-wrap gap-1.5">
                   {ent.signaux.map((s, i) => (
-                    <Badge
-                      key={i}
-                      variant="outline"
-                      className="border-primary/20 bg-primary/[0.04] font-normal"
-                    >
-                      {s}
-                    </Badge>
+                    <SignalBadge key={i}>{s}</SignalBadge>
                   ))}
                 </div>
               </Field>

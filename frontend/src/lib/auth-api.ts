@@ -1,64 +1,54 @@
-import api from '@/lib/api'
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+} from '@/lib/api'
 import type { AuthUser, LoginResponse } from '@/lib/auth-types'
 
-export async function loginApi(
-  email: string,
-  password: string,
-): Promise<LoginResponse> {
-  // OAuth2PasswordRequestForm expects form-urlencoded with `username` field.
-  const body = new URLSearchParams({ username: email, password })
-  const { data } = await api.post<LoginResponse>('/auth/login', body, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    // Don't surface a 401 here as a global logout — it's the login attempt.
-    _skipAuthRedirect: true,
-  } as Parameters<typeof api.post>[2])
-  return data
-}
+export const loginApi = (email: string, password: string) =>
+  apiPost<LoginResponse>(
+    '/auth/login',
+    new URLSearchParams({ username: email, password }),
+    {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      _skipAuthRedirect: true,
+    },
+  )
 
-export async function fetchMe(): Promise<AuthUser> {
-  const { data } = await api.get<AuthUser>('/auth/me')
-  return data
-}
+export const fetchMe = () => apiGet<AuthUser>('/auth/me')
 
-export async function updateMe(payload: {
+export const updateMe = (payload: {
   fullName?: string | null
   email?: string
-}): Promise<AuthUser> {
-  const { data } = await api.patch<AuthUser>('/auth/me', {
+}) =>
+  apiPatch<AuthUser>('/auth/me', {
     full_name: payload.fullName,
     email: payload.email,
   })
-  return data
-}
 
-export async function changePassword(
+export const changePassword = (
   currentPassword: string,
   newPassword: string,
-): Promise<void> {
-  await api.post('/auth/me/password', {
+) =>
+  apiPost<void>('/auth/me/password', {
     current_password: currentPassword,
     new_password: newPassword,
   })
-}
 
-export async function forgotPassword(email: string): Promise<void> {
-  await api.post(
+export const forgotPassword = (email: string) =>
+  apiPost<void>(
     '/auth/forgot-password',
     { email },
-    { _skipAuthRedirect: true } as Parameters<typeof api.post>[2],
+    { _skipAuthRedirect: true },
   )
-}
 
-export async function resetPassword(
-  token: string,
-  password: string,
-): Promise<void> {
-  await api.post(
+export const resetPassword = (token: string, password: string) =>
+  apiPost<void>(
     '/auth/reset-password',
     { token, password },
-    { _skipAuthRedirect: true } as Parameters<typeof api.post>[2],
+    { _skipAuthRedirect: true },
   )
-}
 
 // ---------------------------------------------------------------------------
 // Admin user management
@@ -77,33 +67,15 @@ export type UserUpdatePayload = {
   is_admin?: boolean
 }
 
-export async function listUsers(): Promise<AuthUser[]> {
-  const { data } = await api.get<AuthUser[]>('/users')
-  return data
-}
+export const listUsers = () => apiGet<AuthUser[]>('/users')
 
-export async function createUserApi(payload: UserCreatePayload): Promise<AuthUser> {
-  const { data } = await api.post<AuthUser>('/users', payload)
-  return data
-}
+export const createUserApi = (payload: UserCreatePayload) =>
+  apiPost<AuthUser>('/users', payload)
 
-export async function updateUserApi(
-  id: string,
-  payload: UserUpdatePayload,
-): Promise<AuthUser> {
-  const { data } = await api.patch<AuthUser>(`/users/${id}`, payload)
-  return data
-}
+export const updateUserApi = (id: string, payload: UserUpdatePayload) =>
+  apiPatch<AuthUser>(`/users/${id}`, payload)
 
-export async function deleteUserApi(id: string): Promise<void> {
-  await api.delete(`/users/${id}`)
-}
+export const deleteUserApi = (id: string) => apiDelete(`/users/${id}`)
 
-export async function adminResetUserPassword(
-  id: string,
-): Promise<{ reset_url: string }> {
-  const { data } = await api.post<{ reset_url: string }>(
-    `/users/${id}/reset-password`,
-  )
-  return data
-}
+export const adminSetUserPassword = (id: string, password: string) =>
+  apiPost<void>(`/users/${id}/set-password`, { password })

@@ -1,5 +1,5 @@
 import { Check, Loader2, Sparkles } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { TagsField } from '@/components/tags-field'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FormRow } from '@/components/form-row'
 import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { useSegments } from '@/hooks/use-segments'
@@ -224,21 +224,6 @@ function StepDots({ current }: { current: Step }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Row helper (label + content), pour cohérence avec segment-sheet
-// ---------------------------------------------------------------------------
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-medium text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  )
-}
-
 function SegmentRow({
   label,
   selected,
@@ -286,7 +271,7 @@ function Step1({
 }) {
   return (
     <>
-      <Row label="Segment">
+      <FormRow label="Segment">
         <div className="flex flex-col gap-1">
           <SegmentRow
             label="Aucun (recherche libre)"
@@ -302,9 +287,9 @@ function Step1({
             />
           ))}
         </div>
-      </Row>
+      </FormRow>
 
-      <Row label="Nombre de leads">
+      <FormRow label="Nombre de leads">
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-end font-mono text-sm tabular-nums">
             {count}
@@ -320,7 +305,7 @@ function Step1({
             step={1}
           />
         </div>
-      </Row>
+      </FormRow>
     </>
   )
 }
@@ -358,48 +343,48 @@ function Step2({
 }) {
   return (
     <>
-      <Row label="Intitulé de poste">
+      <FormRow label="Intitulé de poste">
         <TagsField
           values={postes}
           onChange={onPostesChange}
           placeholder="Ex : Pharmacien titulaire"
         />
-      </Row>
+      </FormRow>
 
-      <Row label="Taille">
+      <FormRow label="Taille">
         <Input
           value={taille}
           onChange={(e) => onTailleChange(e.target.value)}
           placeholder="Ex : 2 à 5 salariés"
           className="h-9 text-sm"
         />
-      </Row>
+      </FormRow>
 
-      <Row label="Activité ciblée">
+      <FormRow label="Activité ciblée">
         <TagsField
           values={activite}
           onChange={onActiviteChange}
           placeholder="Ex : Officine indépendante"
         />
-      </Row>
+      </FormRow>
 
-      <Row label="Zone géographique">
+      <FormRow label="Zone géographique">
         <TagsField
           values={zone}
           onChange={onZoneChange}
           placeholder="Ex : Agglomération toulousaine"
         />
-      </Row>
+      </FormRow>
 
-      <Row label="Signaux recherchés">
+      <FormRow label="Signaux recherchés">
         <TagsField
           values={signaux}
           onChange={onSignauxChange}
           placeholder="Ex : Reprise récente"
         />
-      </Row>
+      </FormRow>
 
-      <Row label="Demandes en plus (optionnel)">
+      <FormRow label="Demandes en plus (optionnel)">
         <Textarea
           value={instruction}
           onChange={(e) => onInstructionChange(e.target.value)}
@@ -407,7 +392,7 @@ function Step2({
           rows={3}
           className="!text-sm"
         />
-      </Row>
+      </FormRow>
     </>
   )
 }

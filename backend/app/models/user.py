@@ -5,7 +5,6 @@ authenticated user can access all routes of the app for now — admin is only
 used to gate user-management endpoints (create/disable users) when we
 build them.
 """
-import secrets
 import uuid
 from datetime import datetime
 
@@ -18,10 +17,6 @@ from app.core.database import Base
 
 def _new_user_id() -> uuid.UUID:
     return uuid.uuid4()
-
-
-def _new_reset_token() -> str:
-    return secrets.token_urlsafe(32)
 
 
 class User(Base):

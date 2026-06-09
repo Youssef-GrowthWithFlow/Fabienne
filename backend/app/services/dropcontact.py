@@ -67,14 +67,6 @@ def _client() -> httpx.AsyncClient:
     )
 
 
-async def aclose() -> None:
-    try:
-        await _client().aclose()
-        _client.cache_clear()
-    except Exception:  # pragma: no cover
-        logger.exception("dropcontact client close failed")
-
-
 def _enabled() -> bool:
     return bool(settings.DROPCONTACT_API_KEY)
 

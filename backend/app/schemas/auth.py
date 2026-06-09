@@ -60,7 +60,7 @@ class UserUpdateIn(BaseModel):
     is_admin: bool | None = None
 
 
-class AdminResetPasswordOut(BaseModel):
-    """Payload returned when an admin issues a reset link for another user."""
+class AdminSetPasswordIn(BaseModel):
+    """Admin sets a new password for another user, directly (no email step)."""
 
-    reset_url: str
+    password: str = Field(min_length=8, max_length=128)

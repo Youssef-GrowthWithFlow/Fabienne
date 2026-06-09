@@ -8,8 +8,8 @@ import {
   X,
 } from 'lucide-react'
 
+import { SignalBadge } from '@/components/signal-badge'
 import { WithSourceTooltip } from '@/components/with-source-tooltip'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
@@ -79,13 +79,7 @@ export function CandidateSheet({
             <Block label="Signaux">
               <div className="flex flex-wrap gap-1.5">
                 {candidate.signaux.map((s, i) => (
-                  <Badge
-                    key={i}
-                    variant="outline"
-                    className="border-primary/20 bg-primary/[0.04] font-normal"
-                  >
-                    {s}
-                  </Badge>
+                  <SignalBadge key={i}>{s}</SignalBadge>
                 ))}
               </div>
             </Block>

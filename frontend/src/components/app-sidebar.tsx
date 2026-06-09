@@ -5,6 +5,7 @@ import {
   LogOut,
   ShieldCheck,
   Telescope,
+  UserCog,
   UserSearch,
   type LucideIcon,
 } from 'lucide-react'
@@ -105,12 +106,14 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
           )}
           {user && (
             <SidebarMenuItem>
-              <div
-                className="flex min-w-0 items-center gap-2 px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden"
-                title={user.email}
+              <SidebarMenuButton
+                render={<NavLink to="/compte" />}
+                tooltip="Mon compte"
+                isActive={pathname.startsWith('/compte')}
               >
+                <UserCog />
                 <span className="truncate">{user.email}</span>
-              </div>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           )}
           <SidebarMenuItem>

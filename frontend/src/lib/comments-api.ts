@@ -1,39 +1,19 @@
-import api from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
 import type { Comment } from '@/lib/prospects'
 
-export async function listComments(prospectId: string): Promise<Comment[]> {
-  const { data } = await api.get<Comment[]>(
-    `/prospects/${prospectId}/comments`,
-  )
-  return data
-}
+export const listComments = (prospectId: string) =>
+  apiGet<Comment[]>(`/prospects/${prospectId}/comments`)
 
-export async function createComment(
+export const createComment = (
   prospectId: string,
   input: { date: string; texte: string },
-): Promise<Comment> {
-  const { data } = await api.post<Comment>(
-    `/prospects/${prospectId}/comments`,
-    input,
-  )
-  return data
-}
+) => apiPost<Comment>(`/prospects/${prospectId}/comments`, input)
 
-export async function updateComment(
+export const updateComment = (
   prospectId: string,
   commentId: string,
   patch: { texte?: string; date?: string },
-): Promise<Comment> {
-  const { data } = await api.put<Comment>(
-    `/prospects/${prospectId}/comments/${commentId}`,
-    patch,
-  )
-  return data
-}
+) => apiPut<Comment>(`/prospects/${prospectId}/comments/${commentId}`, patch)
 
-export async function deleteComment(
-  prospectId: string,
-  commentId: string,
-): Promise<void> {
-  await api.delete(`/prospects/${prospectId}/comments/${commentId}`)
-}
+export const deleteComment = (prospectId: string, commentId: string) =>
+  apiDelete(`/prospects/${prospectId}/comments/${commentId}`)

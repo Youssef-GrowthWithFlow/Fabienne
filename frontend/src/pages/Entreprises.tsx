@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 
 import { EntrepriseMeta } from '@/components/entreprise-meta'
 import { EntrepriseSheet } from '@/components/entreprise-sheet'
+import { SignalBadge } from '@/components/signal-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -378,13 +379,7 @@ function EntrepriseCard({
       {signaux.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {signaux.slice(0, 4).map((s, i) => (
-            <Badge
-              key={i}
-              variant="outline"
-              className="border-primary/20 bg-primary/[0.04] font-normal"
-            >
-              {s}
-            </Badge>
+            <SignalBadge key={i}>{s}</SignalBadge>
           ))}
           {signaux.length > 4 && (
             <span className="text-[11px] text-muted-foreground/80">

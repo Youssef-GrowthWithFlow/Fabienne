@@ -15,6 +15,7 @@ import { EntreprisesProvider } from '@/hooks/use-entreprises'
 import { ProspectsProvider } from '@/hooks/use-prospects'
 import { SegmentsProvider } from '@/hooks/use-segments'
 import { SourcerProvider } from '@/hooks/use-sourcer-history'
+import { Account } from '@/pages/Account'
 import { AdminUsers } from '@/pages/AdminUsers'
 import { Dashboard } from '@/pages/Dashboard'
 import { Entreprises } from '@/pages/Entreprises'
@@ -97,6 +98,7 @@ function AppShell() {
                         <Route path="/sourcer" element={<Sourcer />} />
                         <Route path="/segments" element={<Segments />} />
                         <Route path="/admin/users" element={<AdminUsers />} />
+                        <Route path="/compte" element={<Account />} />
                       </Routes>
                     </div>
                   </SidebarInset>

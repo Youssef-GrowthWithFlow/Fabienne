@@ -1,28 +1,14 @@
-import api from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
 import type { SegmentBrief } from '@/lib/segments'
 
 export type SegmentRecord = { id: string } & SegmentBrief
 
-export async function listSegments(): Promise<SegmentRecord[]> {
-  const { data } = await api.get<SegmentRecord[]>('/segments')
-  return data
-}
+export const listSegments = () => apiGet<SegmentRecord[]>('/segments')
 
-export async function createSegment(
-  brief: SegmentBrief,
-): Promise<SegmentRecord> {
-  const { data } = await api.post<SegmentRecord>('/segments', brief)
-  return data
-}
+export const createSegment = (brief: SegmentBrief) =>
+  apiPost<SegmentRecord>('/segments', brief)
 
-export async function updateSegment(
-  id: string,
-  brief: SegmentBrief,
-): Promise<SegmentRecord> {
-  const { data } = await api.put<SegmentRecord>(`/segments/${id}`, brief)
-  return data
-}
+export const updateSegment = (id: string, brief: SegmentBrief) =>
+  apiPut<SegmentRecord>(`/segments/${id}`, brief)
 
-export async function deleteSegment(id: string): Promise<void> {
-  await api.delete(`/segments/${id}`)
-}
+export const deleteSegment = (id: string) => apiDelete(`/segments/${id}`)

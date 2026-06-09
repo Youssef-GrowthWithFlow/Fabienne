@@ -110,15 +110,6 @@ def _client() -> httpx.AsyncClient:
     )
 
 
-async def aclose() -> None:
-    """Best-effort close of the singleton client."""
-    try:
-        await _client().aclose()
-        _client.cache_clear()
-    except Exception:  # pragma: no cover
-        logger.exception("google_places client close failed")
-
-
 def _enabled() -> bool:
     return bool(settings.GOOGLE_PLACES_API_KEY)
 

@@ -197,12 +197,3 @@ class GenerateEntreprisesResponse(BaseModel):
     grounding: list[GroundingRef] = Field(default_factory=list)
 
 
-class BulkEntrepriseItem(EntrepriseBase):
-    contacts: list[ProposedContact] = Field(default_factory=list)
-
-
-class BulkCreateRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    segment_id: str | None = Field(default=None, alias="segmentId")
-    entreprises: list[BulkEntrepriseItem] = Field(default_factory=list)

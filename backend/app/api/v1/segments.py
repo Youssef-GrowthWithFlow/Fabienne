@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1._helpers import get_or_404
 from app.core.database import get_db
 from app.models.segment import Segment
 from app.schemas.segment import SegmentCreate, SegmentRead, SegmentUpdate
@@ -10,13 +11,6 @@ router = APIRouter(
     prefix="/segments",
     tags=["segments"],
 )
-
-
-async def _get_or_404(db: AsyncSession, segment_id: str) -> Segment:
-    obj = await db.get(Segment, segment_id)
-    if obj is None:
-        raise HTTPException(status_code=404, detail="Segment not found")
-    return obj
 
 
 @router.get("", response_model=list[SegmentRead], response_model_by_alias=True)
@@ -45,7 +39,7 @@ async def create_segment(
 async def get_segment(
     segment_id: str, db: AsyncSession = Depends(get_db)
 ) -> Segment:
-    return await _get_or_404(db, segment_id)
+    return await get_or_404(db, Segment, segment_id)
 
 
 @router.put("/{segment_id}", response_model=SegmentRead, response_model_by_alias=True)
@@ -54,7 +48,7 @@ async def update_segment(
     payload: SegmentUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> Segment:
-    obj = await _get_or_404(db, segment_id)
+    obj = await get_or_404(db, Segment, segment_id)
     for key, value in payload.model_dump(by_alias=False).items():
         setattr(obj, key, value)
     await db.commit()
@@ -66,7 +60,7 @@ async def update_segment(
 async def delete_segment(
     segment_id: str, db: AsyncSession = Depends(get_db)
 ) -> Response:
-    obj = await _get_or_404(db, segment_id)
+    obj = await get_or_404(db, Segment, segment_id)
     await db.delete(obj)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

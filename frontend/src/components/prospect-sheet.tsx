@@ -69,13 +69,14 @@ import {
 } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { ActionDialog, type ActionDialogKind } from '@/components/action-dialog'
+import { InlineText } from '@/components/inline-text'
+import { SignalBadge } from '@/components/signal-badge'
 import { SourceBadge } from '@/components/source-badge'
 import { useActions } from '@/hooks/use-actions'
 import { useEntreprises } from '@/hooks/use-entreprises'
 import { useProspects } from '@/hooks/use-prospects'
 import { regenerateEntrepriseFiche } from '@/lib/entreprises-api'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import {
   STATUSES,
   formatDate,
@@ -87,67 +88,7 @@ import {
   type ProspectStatus,
 } from '@/lib/prospects'
 
-type InlineProps = {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  type?: 'text' | 'email' | 'tel' | 'url'
-  className?: string
-  displayClassName?: string
-}
-
-function InlineText({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  className,
-  displayClassName,
-}: InlineProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-
-  function commit() {
-    if (draft !== value) onChange(draft)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <Input
-        autoFocus
-        type={type}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit()
-          else if (e.key === 'Escape') setEditing(false)
-        }}
-        className={cn('h-8 !text-sm', className)}
-        placeholder={placeholder}
-      />
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setDraft(value)
-        setEditing(true)
-      }}
-      className={cn(
-        'hover:bg-muted/50 block w-full rounded px-2.5 py-1 text-left text-sm',
-        !value && 'text-muted-foreground italic',
-        displayClassName,
-      )}
-    >
-      {value || placeholder || 'Vide'}
-    </button>
-  )
-}
+const INLINE_DISPLAY = 'hover:bg-muted/50 block w-full rounded px-2.5 py-1'
 
 function Row({
   icon: Icon,
@@ -558,6 +499,8 @@ export function ProspectSheet({
                 value={prospect.nom}
                 onChange={(v) => update('nom', v)}
                 placeholder="Nom du prospect"
+                displayClassName={INLINE_DISPLAY}
+                emptyLabel="Vide"
               />
             </Row>
             <Row
@@ -569,6 +512,8 @@ export function ProspectSheet({
                 value={prospect.role}
                 onChange={(v) => update('role', v)}
                 placeholder="Pharmacien titulaire…"
+                displayClassName={INLINE_DISPLAY}
+                emptyLabel="Vide"
               />
             </Row>
             <Row icon={Building2} label="Entreprise">
@@ -609,6 +554,8 @@ export function ProspectSheet({
                 value={prospect.email}
                 onChange={(v) => update('email', v)}
                 placeholder="contact@exemple.com"
+                displayClassName={INLINE_DISPLAY}
+                emptyLabel="Vide"
               />
             </Row>
             <Row
@@ -621,6 +568,8 @@ export function ProspectSheet({
                 value={prospect.telephone}
                 onChange={(v) => update('telephone', v)}
                 placeholder="06 12 34 56 78"
+                displayClassName={INLINE_DISPLAY}
+                emptyLabel="Vide"
               />
             </Row>
             <Row
@@ -634,6 +583,8 @@ export function ProspectSheet({
                 value={prospect.linkedin ?? ''}
                 onChange={(v) => update('linkedin', v ? v : null)}
                 placeholder="https://linkedin.com/in/…"
+                displayClassName={INLINE_DISPLAY}
+                emptyLabel="Vide"
               />
             </Row>
             {prospect.entreprise?.signaux &&
@@ -641,13 +592,7 @@ export function ProspectSheet({
                 <Row icon={Target} label="Signaux entreprise">
                   <div className="flex flex-wrap gap-1.5 px-1 py-1">
                     {prospect.entreprise.signaux.map((s, i) => (
-                      <Badge
-                        key={i}
-                        variant="outline"
-                        className="border-primary/20 bg-primary/[0.04] font-normal"
-                      >
-                        {s}
-                      </Badge>
+                      <SignalBadge key={i}>{s}</SignalBadge>
                     ))}
                   </div>
                 </Row>

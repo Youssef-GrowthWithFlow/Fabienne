@@ -1,29 +1,14 @@
-import api from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
 import type { Prospect } from '@/lib/prospects'
 
-export async function listProspects(): Promise<Prospect[]> {
-  const { data } = await api.get<Prospect[]>('/prospects')
-  return data
-}
+export const listProspects = () => apiGet<Prospect[]>('/prospects')
 
-export async function getProspect(id: string): Promise<Prospect> {
-  const { data } = await api.get<Prospect>(`/prospects/${id}`)
-  return data
-}
+export const getProspect = (id: string) => apiGet<Prospect>(`/prospects/${id}`)
 
-export async function createProspect(prospect: Prospect): Promise<Prospect> {
-  const { data } = await api.post<Prospect>('/prospects', prospect)
-  return data
-}
+export const createProspect = (prospect: Prospect) =>
+  apiPost<Prospect>('/prospects', prospect)
 
-export async function updateProspect(
-  id: string,
-  prospect: Prospect,
-): Promise<Prospect> {
-  const { data } = await api.put<Prospect>(`/prospects/${id}`, prospect)
-  return data
-}
+export const updateProspect = (id: string, prospect: Prospect) =>
+  apiPut<Prospect>(`/prospects/${id}`, prospect)
 
-export async function deleteProspect(id: string): Promise<void> {
-  await api.delete(`/prospects/${id}`)
-}
+export const deleteProspect = (id: string) => apiDelete(`/prospects/${id}`)

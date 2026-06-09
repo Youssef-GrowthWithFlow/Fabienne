@@ -1,4 +1,4 @@
-import api from '@/lib/api'
+import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import { getToken } from '@/lib/auth'
 import type {
   EntrepriseRecord,
@@ -30,17 +30,6 @@ export type SourcerRunResponse = {
   candidates: SourcedCandidate[]
   searchQueries: string[]
 }
-
-export async function runSourcing(
-  payload: SourcerRunRequest,
-): Promise<SourcerRunResponse> {
-  const { data } = await api.post<SourcerRunResponse>('/sourcer/run', payload)
-  return data
-}
-
-// ---------------------------------------------------------------------------
-// SSE streaming version — emits phase events while the sourcing runs.
-// ---------------------------------------------------------------------------
 
 export type SourcerPhase =
   | 'loading_history'
@@ -162,44 +151,22 @@ export async function runSourcingStream(
   return finalResult
 }
 
-export async function listSourcedCandidates(
-  status?: SourcedStatus,
-): Promise<SourcedCandidate[]> {
-  const { data } = await api.get<SourcedCandidate[]>('/sourcer/candidates', {
+export const listSourcedCandidates = (status?: SourcedStatus) =>
+  apiGet<SourcedCandidate[]>('/sourcer/candidates', {
     params: status ? { status_filter: status } : undefined,
   })
-  return data
-}
 
-export async function updateSourcedCandidate(
+export const updateSourcedCandidate = (
   id: string,
   patch: { mainContactIndex?: number },
-): Promise<SourcedCandidate> {
-  const { data } = await api.patch<SourcedCandidate>(
-    `/sourcer/candidates/${id}`,
-    patch,
-  )
-  return data
-}
+) => apiPatch<SourcedCandidate>(`/sourcer/candidates/${id}`, patch)
 
-export async function refuseSourcedCandidate(
-  id: string,
-): Promise<SourcedCandidate> {
-  const { data } = await api.post<SourcedCandidate>(
-    `/sourcer/candidates/${id}/refuse`,
-  )
-  return data
-}
+export const refuseSourcedCandidate = (id: string) =>
+  apiPost<SourcedCandidate>(`/sourcer/candidates/${id}/refuse`)
 
-export async function validateSourcedCandidate(id: string): Promise<{
-  candidate: SourcedCandidate
-  entreprise: EntrepriseRecord | null
-  prospect: Prospect | null
-}> {
-  const { data } = await api.post<{
+export const validateSourcedCandidate = (id: string) =>
+  apiPost<{
     candidate: SourcedCandidate
     entreprise: EntrepriseRecord | null
     prospect: Prospect | null
   }>(`/sourcer/candidates/${id}/validate`)
-  return data
-}

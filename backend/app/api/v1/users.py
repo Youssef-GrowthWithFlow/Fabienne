@@ -13,16 +13,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
-    AdminResetPasswordOut,
+    AdminSetPasswordIn,
     UserCreateIn,
     UserOut,
     UserUpdateIn,
 )
-from app.services.auth import hash_password, issue_reset_token, require_admin
+from app.services.auth import hash_password, require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -111,25 +110,20 @@ async def delete_user(
     return None
 
 
-@router.post(
-    "/{user_id}/reset-password",
-    response_model=AdminResetPasswordOut,
-)
-async def admin_reset_password(
+@router.post("/{user_id}/set-password", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_set_password(
     user_id: str,
+    payload: AdminSetPasswordIn,
     db: AsyncSession = Depends(get_db),
-) -> AdminResetPasswordOut:
-    """Issue a single-use reset token and return the full reset URL.
+) -> None:
+    """Set a new password for another user, directly.
 
-    Same flow as ``/auth/forgot-password`` but bypasses the email step :
-    the admin gets the URL back directly so it can be handed to the user
-    (until SMTP is wired up).
+    No email / token round-trip : the admin types (or generates) the new
+    password in the UI and it takes effect immediately. The admin then hands
+    it to the user out-of-band.
     """
     user = await _get_or_404(db, user_id)
-    token = issue_reset_token(user, settings.PASSWORD_RESET_EXPIRE_MINUTES)
+    user.password_hash = hash_password(payload.password)
     await db.commit()
-    reset_url = (
-        f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
-    )
-    logger.info("Admin reset for %s → %s", user.email, reset_url)
-    return AdminResetPasswordOut(reset_url=reset_url)
+    logger.info("Admin set password for %s", user.email)
+    return None

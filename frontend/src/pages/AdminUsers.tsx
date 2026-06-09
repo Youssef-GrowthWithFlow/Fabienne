@@ -2,6 +2,7 @@ import {
   Copy,
   KeyRound,
   Loader2,
+  RefreshCw,
   ShieldCheck,
   Trash2,
   UserPlus,
@@ -25,7 +26,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/hooks/use-auth'
 import {
-  adminResetUserPassword,
+  adminSetUserPassword,
   createUserApi,
   deleteUserApi,
   listUsers,
@@ -33,12 +34,13 @@ import {
   type UserCreatePayload,
 } from '@/lib/auth-api'
 import type { AuthUser } from '@/lib/auth-types'
-import { cn } from '@/lib/utils'
+import { cn, generatePassword } from '@/lib/utils'
 
 export function AdminUsers() {
   const { user: me } = useAuth()
   const [users, setUsers] = useState<AuthUser[] | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [pwdUser, setPwdUser] = useState<AuthUser | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
   const refresh = async () => {
@@ -95,22 +97,6 @@ export function AdminUsers() {
     }
   }
 
-  async function resetPassword(u: AuthUser) {
-    setBusy(u.id)
-    try {
-      const res = await adminResetUserPassword(u.id)
-      await navigator.clipboard.writeText(res.reset_url).catch(() => {})
-      toast.success('Lien de réinitialisation copié.', {
-        description: 'Transmets-le à ' + u.email,
-        duration: 10000,
-      })
-    } catch {
-      toast.error("Impossible de générer le lien.")
-    } finally {
-      setBusy(null)
-    }
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -152,7 +138,7 @@ export function AdminUsers() {
               onToggleActive={() => toggleActive(u)}
               onToggleAdmin={() => toggleAdmin(u)}
               onRemove={() => removeUser(u)}
-              onResetPassword={() => resetPassword(u)}
+              onSetPassword={() => setPwdUser(u)}
             />
           ))}
         </div>
@@ -163,6 +149,13 @@ export function AdminUsers() {
         onOpenChange={setDrawerOpen}
         onCreated={(u) => {
           setUsers((prev) => (prev ? [u, ...prev] : [u]))
+        }}
+      />
+
+      <SetPasswordDrawer
+        user={pwdUser}
+        onOpenChange={(open) => {
+          if (!open) setPwdUser(null)
         }}
       />
     </div>
@@ -176,7 +169,7 @@ function UserRow({
   onToggleActive,
   onToggleAdmin,
   onRemove,
-  onResetPassword,
+  onSetPassword,
 }: {
   user: AuthUser
   isMe: boolean
@@ -184,7 +177,7 @@ function UserRow({
   onToggleActive: () => void
   onToggleAdmin: () => void
   onRemove: () => void
-  onResetPassword: () => void
+  onSetPassword: () => void
 }) {
   return (
     <div
@@ -223,16 +216,12 @@ function UserRow({
         <Button
           variant="outline"
           size="sm"
-          onClick={onResetPassword}
+          onClick={onSetPassword}
           disabled={busy}
           className="gap-1.5"
         >
-          {busy ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : (
-            <KeyRound className="size-3" />
-          )}
-          Réinitialiser
+          <KeyRound className="size-3" />
+          Mot de passe
         </Button>
         <Button
           variant="ghost"
@@ -418,6 +407,129 @@ function CreateUserDrawer({
             >
               {submitting && <Loader2 className="size-3.5 animate-spin" />}
               Créer
+            </Button>
+          </DrawerFooter>
+        </form>
+      </DrawerContent>
+    </Drawer>
+  )
+}
+
+function SetPasswordDrawer({
+  user,
+  onOpenChange,
+}: {
+  user: AuthUser | null
+  onOpenChange: (open: boolean) => void
+}) {
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (user) {
+      setPassword(generatePassword())
+      setError(null)
+      setSubmitting(false)
+    }
+  }, [user])
+
+  const canSubmit = password.length >= 8
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!canSubmit || submitting || !user) return
+    setError(null)
+    setSubmitting(true)
+    try {
+      await adminSetUserPassword(user.id, password)
+      await navigator.clipboard.writeText(password).catch(() => {})
+      toast.success('Mot de passe mis à jour et copié.', {
+        description: 'Transmets-le à ' + user.email,
+        duration: 10000,
+      })
+      onOpenChange(false)
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail ?? 'Échec de la mise à jour.'
+      setError(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Drawer open={user != null} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <form onSubmit={handleSubmit} className="mx-auto w-full max-w-lg">
+          <DrawerHeader>
+            <DrawerTitle>Changer le mot de passe</DrawerTitle>
+            <DrawerDescription>
+              Nouveau mot de passe pour {user?.full_name || user?.email}. Il
+              prend effet immédiatement — transmets-le à la personne.
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="flex flex-col gap-4 px-4 pb-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="sp-password">Mot de passe</Label>
+              <div className="flex gap-1.5">
+                <Input
+                  id="sp-password"
+                  type="text"
+                  required
+                  minLength={8}
+                  autoFocus
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="8 caractères minimum"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPassword(generatePassword())}
+                  title="Générer"
+                >
+                  <RefreshCw className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    navigator.clipboard.writeText(password).catch(() => {})
+                    toast.success('Mot de passe copié.')
+                  }}
+                  disabled={password.length < 8}
+                  title="Copier"
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+
+          <DrawerFooter className="flex-row justify-end">
+            <DrawerClose asChild>
+              <Button type="button" variant="ghost" disabled={submitting}>
+                Annuler
+              </Button>
+            </DrawerClose>
+            <Button
+              type="submit"
+              disabled={!canSubmit || submitting}
+              className="gap-1.5"
+            >
+              {submitting && <Loader2 className="size-3.5 animate-spin" />}
+              Enregistrer
             </Button>
           </DrawerFooter>
         </form>

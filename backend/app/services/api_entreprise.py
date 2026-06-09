@@ -75,19 +75,6 @@ def _client() -> httpx.AsyncClient:
     )
 
 
-async def aclose() -> None:
-    """Close the singleton client (call from app shutdown if desired)."""
-    try:
-        client = _client.cache_info()  # noqa: F841 — only to test populated state
-    except Exception:  # pragma: no cover
-        return
-    try:
-        await _client().aclose()
-        _client.cache_clear()
-    except Exception:  # pragma: no cover
-        logger.exception("api_entreprise client close failed")
-
-
 async def _request(path: str, params: dict[str, Any]) -> dict | None:
     """GET with retry on 429/5xx (1 retry, ~1s backoff)."""
     sem = _semaphore()
@@ -282,14 +269,6 @@ async def search(
         return []
     results = payload.get("results") or []
     return results if isinstance(results, list) else []
-
-
-async def get_by_siret(siret: str) -> dict | None:
-    siret = (siret or "").strip()
-    if not siret:
-        return None
-    results = await search(siret, per_page=1)
-    return results[0] if results else None
 
 
 async def enrich(

@@ -12,109 +12,20 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { FormRow } from '@/components/form-row'
+import { InlineText } from '@/components/inline-text'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TagsField } from '@/components/tags-field'
-import { Textarea } from '@/components/ui/textarea'
 import { useSegments } from '@/hooks/use-segments'
-import { cn } from '@/lib/utils'
 import type { Segment } from '@/lib/prospects'
 import {
   DATA_SOURCE_OPTIONS,
   type AISource,
   type SegmentBrief,
 } from '@/lib/segments'
-
-type InlineTextProps = {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  multiline?: boolean
-  className?: string
-  displayClassName?: string
-}
-
-function InlineText({
-  value,
-  onChange,
-  placeholder,
-  multiline = false,
-  className,
-  displayClassName,
-}: InlineTextProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-
-  function commit() {
-    if (draft !== value) onChange(draft)
-    setEditing(false)
-  }
-
-  if (editing) {
-    if (multiline) {
-      return (
-        <Textarea
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setEditing(false)
-          }}
-          rows={3}
-          className={cn('resize-y text-sm', className)}
-          placeholder={placeholder}
-        />
-      )
-    }
-    return (
-      <Input
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit()
-          else if (e.key === 'Escape') setEditing(false)
-        }}
-        className={cn('h-8 !text-sm', className)}
-        placeholder={placeholder}
-      />
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setDraft(value)
-        setEditing(true)
-      }}
-      className={cn(
-        'rounded-sm text-left text-sm hover:bg-muted/60',
-        !value && 'italic text-muted-foreground',
-        displayClassName,
-      )}
-    >
-      {value || placeholder || 'Ajouter…'}
-    </button>
-  )
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-medium text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  )
-}
 
 function NotesSection({
   value,
@@ -364,93 +275,93 @@ export function SegmentSheet({ segment, onClose }: Props) {
           >
             <div className="flex flex-col gap-6">
               <Section title="Identité">
-                <Row label="Nom">
+                <FormRow label="Nom">
                   <InlineText
                     value={brief.nom}
                     onChange={(v) => set('nom', v)}
                     placeholder={segment}
                   />
-                </Row>
-                <Row label="Description">
+                </FormRow>
+                <FormRow label="Description">
                   <InlineText
                     value={brief.description}
                     onChange={(v) => set('description', v)}
                     placeholder="Ajouter une description"
                     multiline
                   />
-                </Row>
+                </FormRow>
               </Section>
 
               <Section title="À qui on parle">
-                <Row label="Intitulé de poste">
+                <FormRow label="Intitulé de poste">
                   <TagsField
                     values={brief.postes}
                     onChange={(v) => set('postes', v)}
                     placeholder="Ex : Pharmacien titulaire"
                   />
-                </Row>
-                <Row label="Taille">
+                </FormRow>
+                <FormRow label="Taille">
                   <InlineText
                     value={brief.tailleStructure}
                     onChange={(v) => set('tailleStructure', v)}
                     placeholder="Ex : 2 à 5 salariés"
                   />
-                </Row>
-                <Row label="Activité ciblée">
+                </FormRow>
+                <FormRow label="Activité ciblée">
                   <TagsField
                     values={brief.activiteCiblee}
                     onChange={(v) => set('activiteCiblee', v)}
                     placeholder="Ex : Officine indépendante"
                   />
-                </Row>
-                <Row label="Zone géographique">
+                </FormRow>
+                <FormRow label="Zone géographique">
                   <TagsField
                     values={brief.zoneGeographique}
                     onChange={(v) => set('zoneGeographique', v)}
                     placeholder="Ex : Agglomération toulousaine"
                   />
-                </Row>
+                </FormRow>
               </Section>
 
               <Section title="Ce qui leur pose problème">
-                <Row label="Problèmes">
+                <FormRow label="Problèmes">
                   <TagsField
                     values={brief.painPoints}
                     onChange={(v) => set('painPoints', v)}
                   />
-                </Row>
+                </FormRow>
               </Section>
 
               <Section title="Signaux">
-                <Row label="Must have">
+                <FormRow label="Must have">
                   <TagsField
                     values={brief.mustHave}
                     onChange={(v) => set('mustHave', v)}
                     placeholder="Ex : Vient de prendre son poste"
                   />
-                </Row>
-                <Row label="Should have">
+                </FormRow>
+                <FormRow label="Should have">
                   <TagsField
                     values={brief.shouldHave}
                     onChange={(v) => set('shouldHave', v)}
                   />
-                </Row>
-                <Row label="Red flag">
+                </FormRow>
+                <FormRow label="Red flag">
                   <TagsField
                     values={brief.redFlags}
                     onChange={(v) => set('redFlags', v)}
                   />
-                </Row>
+                </FormRow>
               </Section>
 
               <Section title="Pistes pour chercher">
-                <Row label="Sources utiles">
+                <FormRow label="Sources utiles">
                   <TagsField
                     values={brief.sources}
                     onChange={(v) => set('sources', v)}
                     placeholder="Ex : LinkedIn Sales Navigator"
                   />
-                </Row>
+                </FormRow>
               </Section>
 
               <Section title="Sources web pour l'IA">
@@ -479,31 +390,31 @@ export function SegmentSheet({ segment, onClose }: Props) {
           >
             <div className="flex flex-col gap-6">
               <Section title="Notre promesse">
-                <Row label="En une phrase">
+                <FormRow label="En une phrase">
                   <InlineText
                     value={brief.pitch}
                     onChange={(v) => set('pitch', v)}
                     placeholder="Ce qu’on leur apporte, sans jargon"
                     multiline
                   />
-                </Row>
+                </FormRow>
               </Section>
 
               <Section title="Pourquoi ça marche">
-                <Row label="Bénéfices">
+                <FormRow label="Bénéfices">
                   <TagsField
                     values={brief.benefices}
                     onChange={(v) => set('benefices', v)}
                     placeholder="Un bénéfice concret"
                   />
-                </Row>
-                <Row label="Preuves">
+                </FormRow>
+                <FormRow label="Preuves">
                   <TagsField
                     values={brief.preuves}
                     onChange={(v) => set('preuves', v)}
                     placeholder="Chiffre, cas client, logo"
                   />
-                </Row>
+                </FormRow>
               </Section>
 
               <NotesSection

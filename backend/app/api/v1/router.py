@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 
 from app.api.v1.actions import router as actions_router
-from app.api.v1.agents import router as agents_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.comments import router as comments_router
 from app.api.v1.entreprises import router as entreprises_router
@@ -29,7 +28,6 @@ router.include_router(entreprises_router, dependencies=PROTECTED)
 router.include_router(prospects_router, dependencies=PROTECTED)
 router.include_router(comments_router, dependencies=PROTECTED)
 router.include_router(actions_router, dependencies=PROTECTED)
-router.include_router(agents_router, dependencies=PROTECTED)
 router.include_router(sourcer_router, dependencies=PROTECTED)
 # users_router déclare déjà require_admin sur chaque route (qui couvre
 # get_current_user) — pas besoin d'ajouter PROTECTED.

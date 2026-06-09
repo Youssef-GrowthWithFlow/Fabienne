@@ -1,4 +1,7 @@
-import axios, { type InternalAxiosRequestConfig } from 'axios'
+import axios, {
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 
 import { clearAuth, emitLogout, getToken } from '@/lib/auth'
 
@@ -37,5 +40,29 @@ api.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+export const apiGet = <T>(path: string, config?: AxiosRequestConfig) =>
+  api.get<T>(path, config).then((r) => r.data)
+
+export const apiPost = <T>(
+  path: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+) => api.post<T>(path, body, config).then((r) => r.data)
+
+export const apiPut = <T>(
+  path: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+) => api.put<T>(path, body, config).then((r) => r.data)
+
+export const apiPatch = <T>(
+  path: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+) => api.patch<T>(path, body, config).then((r) => r.data)
+
+export const apiDelete = (path: string, config?: AxiosRequestConfig) =>
+  api.delete(path, config).then(() => undefined)
 
 export default api
