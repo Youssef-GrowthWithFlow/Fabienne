@@ -81,7 +81,9 @@ export function InlineText({
         displayClassName,
       )}
     >
-      {value || placeholder || emptyLabel}
+      {/* Jamais le placeholder ici : un exemple grisé (« 06 12 34 56 78 »)
+          se confond avec une vraie valeur. Il ne sert qu'en édition. */}
+      {value || emptyLabel}
     </button>
   )
 }
