@@ -59,10 +59,13 @@ export function Aujourdhui() {
     [candidates],
   )
 
-  const { overdue, today, upcoming } = useMemo(
+  const { overdue, today, upcoming, later } = useMemo(
     () => splitRelances(prospects),
     [prospects],
   )
+  // Tout ce qui vient après aujourd'hui — cette semaine ET les semaines
+  // suivantes (déjà trié par date par splitRelances).
+  const nextTasks = useMemo(() => [...upcoming, ...later], [upcoming, later])
 
   const week = useMemo(() => {
     const sent = actions.filter(
@@ -186,14 +189,14 @@ export function Aujourdhui() {
         </div>
       )}
 
-      {/* Ensuite cette semaine */}
-      {!loading && upcoming.length > 0 ? (
+      {/* Prochaines tâches — cette semaine et les semaines suivantes */}
+      {!loading && nextTasks.length > 0 ? (
         <section className="space-y-2">
           <h3 className="text-muted-foreground text-sm font-semibold">
-            Ensuite cette semaine
+            Prochaines tâches
           </h3>
           <div className="divide-border divide-y rounded-xl border">
-            {upcoming.map((p) => (
+            {nextTasks.map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -209,6 +212,12 @@ export function Aujourdhui() {
                     <span className="text-muted-foreground">
                       {' '}
                       · {p.entreprise.entreprise}
+                    </span>
+                  ) : null}
+                  {p.relanceNote ? (
+                    <span className="text-muted-foreground italic">
+                      {' '}
+                      — {p.relanceNote}
                     </span>
                   ) : null}
                 </span>

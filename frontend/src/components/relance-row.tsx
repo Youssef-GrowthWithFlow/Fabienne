@@ -1,4 +1,5 @@
 import { CalendarClock, Check, Mail, Phone, Send } from 'lucide-react'
+import { useRef } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -6,13 +7,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useProspects } from '@/hooks/use-prospects'
 import {
   formatDate,
   isoInDays,
+  relanceLabel,
   taskSentence,
+  todayIso,
   type Prospect,
 } from '@/lib/prospects'
 import { cn } from '@/lib/utils'
@@ -24,16 +28,6 @@ function LinkedinIcon({ className }: { className?: string }) {
     </svg>
   )
 }
-
-const DAY_NAMES_FR = [
-  'dimanche',
-  'lundi',
-  'mardi',
-  'mercredi',
-  'jeudi',
-  'vendredi',
-  'samedi',
-]
 
 /**
  * One follow-up line on the home screen: who, why, and the two actions that
@@ -51,14 +45,17 @@ export function RelanceRow({
   onDone: () => void
 }) {
   const { updateProspect } = useProspects()
+  const dateInputRef = useRef<HTMLInputElement>(null)
   const sentence = taskSentence(prospect)
   const hasChannel = !!(prospect.email || prospect.telephone || prospect.linkedin)
 
-  const postpone = () => {
-    const nextIso = isoInDays(2)
-    const dayName = DAY_NAMES_FR[new Date(`${nextIso}T00:00:00`).getDay()]
-    updateProspect({ ...prospect, relanceDate: nextIso })
-    toast.success(`Ok, je te la remets ${dayName}.`)
+  const postponeTo = (iso: string) => {
+    if (!iso) return
+    updateProspect({ ...prospect, relanceDate: iso })
+    const label = relanceLabel(iso)
+    toast.success(
+      `Ok, je te la remets ${label.charAt(0).toLowerCase()}${label.slice(1)}.`,
+    )
   }
 
   return (
@@ -102,7 +99,7 @@ export function RelanceRow({
         </p>
       </button>
 
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="relative flex shrink-0 items-center gap-1.5">
         {hasChannel ? (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -163,15 +160,52 @@ export function RelanceRow({
           <Check className="size-3.5" />
           C'est fait
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="Plus tard"
-          aria-label="Repousser la relance"
-          onClick={postpone}
-        >
-          <CalendarClock className="size-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Plus tard"
+                aria-label="Repousser la relance"
+              />
+            }
+          >
+            <CalendarClock className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-48">
+            <DropdownMenuItem onClick={() => postponeTo(isoInDays(1))}>
+              Demain
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => postponeTo(isoInDays(2))}>
+              Dans 2 jours
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => postponeTo(isoInDays(7))}>
+              La semaine prochaine
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                const input = dateInputRef.current
+                if (!input) return
+                if (typeof input.showPicker === 'function') input.showPicker()
+                else input.click()
+              }}
+            >
+              Choisir une date…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {/* Sélecteur natif invisible, ouvert par « Choisir une date… ». */}
+        <input
+          ref={dateInputRef}
+          type="date"
+          min={todayIso()}
+          tabIndex={-1}
+          aria-hidden
+          onChange={(e) => postponeTo(e.target.value)}
+          className="pointer-events-none absolute size-0 opacity-0"
+        />
       </div>
     </div>
   )
