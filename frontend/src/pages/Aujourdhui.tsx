@@ -1,4 +1,4 @@
-import { Sparkles, Users } from 'lucide-react'
+import { ArrowRight, Sparkles, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
@@ -6,10 +6,12 @@ import { ContactSheet } from '@/components/contact-sheet'
 import { PipelineBar } from '@/components/pipeline-bar'
 import { QuickLogDrawer } from '@/components/quick-log-drawer'
 import { RelanceRow } from '@/components/relance-row'
+import { ValidationReview } from '@/components/validation-review'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/hooks/use-auth'
 import { useProspects } from '@/hooks/use-prospects'
+import { useSourcerHistory } from '@/hooks/use-sourcer-history'
 import {
   formatDate,
   isThisWeek,
@@ -47,8 +49,15 @@ export function Aujourdhui() {
   const { user } = useAuth()
   const { prospects, actions, loading, getProspect, updateProspect } =
     useProspects()
+  const { candidates } = useSourcerHistory()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [quickLogId, setQuickLogId] = useState<string | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+
+  const aValider = useMemo(
+    () => candidates.filter((c) => c.status === 'pending').length,
+    [candidates],
+  )
 
   const { overdue, today, upcoming } = useMemo(
     () => splitRelances(prospects),
@@ -97,6 +106,30 @@ export function Aujourdhui() {
             : ''}
         </p>
       </div>
+
+      {/* Prospects sourcés qui attendent une décision */}
+      {!loading && aValider > 0 ? (
+        <section className="flex flex-wrap items-center gap-3 rounded-xl border border-violet-200/70 bg-violet-50/50 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+          <div className="bg-violet-100 text-violet-600 dark:bg-violet-950 dark:text-violet-300 flex size-10 shrink-0 items-center justify-center rounded-full">
+            <Sparkles className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1 basis-52">
+            <div className="text-base font-semibold">
+              {aValider} prospect{aValider > 1 ? 's' : ''} à valider
+            </div>
+            <p className="text-muted-foreground text-sm">
+              J'ai trouvé des prospects pour toi — dis-moi lesquels garder.
+            </p>
+          </div>
+          <Button
+            onClick={() => setReviewOpen(true)}
+            className="gap-2 bg-violet-600 text-white hover:bg-violet-700"
+          >
+            Les valider
+            <ArrowRight className="size-4" />
+          </Button>
+        </section>
+      ) : null}
 
       {loading ? (
         <div className="space-y-3">
@@ -208,6 +241,11 @@ export function Aujourdhui() {
           </div>
         </section>
       ) : null}
+
+      <ValidationReview
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+      />
 
       <QuickLogDrawer
         prospect={quickLogProspect}

@@ -57,6 +57,13 @@ async def create_prospect(
             db.add(ent)
             await db.flush()
         data["entreprise_id"] = ent.id
+    # A fresh contact comes with its first task: reach out today. Only when
+    # the caller didn't plan anything themselves and the contact is still
+    # to be worked.
+    if not data.get("relance_date") and data.get("status") in (None, "À contacter"):
+        data["relance_date"] = date.today()
+        if not (data.get("relance_note") or "").strip():
+            data["relance_note"] = "le contacter"
     obj = Prospect(**data)
     db.add(obj)
     await db.flush()

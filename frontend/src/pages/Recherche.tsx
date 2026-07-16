@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   Check,
   ChevronDown,
   Loader2,
@@ -7,26 +8,20 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import { CandidateCard } from '@/components/candidate-card'
-import { CandidateSheet } from '@/components/candidate-sheet'
 import { CreateSegmentDialog } from '@/components/create-segment-dialog'
 import { SegmentSheet } from '@/components/segment-sheet'
 import { SourcingProgress } from '@/components/sourcing-progress'
 import { TagsField } from '@/components/tags-field'
+import { ValidationReview } from '@/components/validation-review'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
-import { useEntreprises } from '@/hooks/use-entreprises'
-import { useProspects } from '@/hooks/use-prospects'
 import { useSegments } from '@/hooks/use-segments'
 import { useSourcerHistory } from '@/hooks/use-sourcer-history'
-import { getEntreprise } from '@/lib/entreprises-api'
-import { getProspect } from '@/lib/prospects-api'
 import { SEGMENT_NONE } from '@/lib/segment-constants'
 import { cn } from '@/lib/utils'
 
@@ -91,13 +86,7 @@ export function Recherche() {
     runInProgress,
     phases,
     generate,
-    validate,
-    refuse,
-    pickContact,
   } = useSourcerHistory()
-  const { ingestMany } = useEntreprises()
-  const { addProspect, replaceProspectLocal } = useProspects()
-  const navigate = useNavigate()
 
   const [segmentId, setSegmentId] = useState<string>(SEGMENT_NONE)
   const [freeText, setFreeText] = useState('')
@@ -111,10 +100,15 @@ export function Recherche() {
   const [zone, setZone] = useState<string[]>([])
   const [signaux, setSignaux] = useState<string[]>([])
 
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewInitialId, setReviewInitialId] = useState<string | null>(null)
   const [editSegmentId, setEditSegmentId] = useState<string | null>(null)
   const [createSegmentOpen, setCreateSegmentOpen] = useState(false)
+
+  const openReview = (id: string | null = null) => {
+    setReviewInitialId(id)
+    setReviewOpen(true)
+  }
 
   useEffect(() => {
     if (segmentId === SEGMENT_NONE) {
@@ -133,16 +127,6 @@ export function Recherche() {
     setZone([...(b.zoneGeographique ?? [])])
     setSignaux([...(b.mustHave ?? [])])
   }, [segmentId, briefs])
-
-  // When a streaming card (id = temp_id) gets persisted at end-of-run, its
-  // entry is replaced by a row with the real DB id. Remap so the open sheet
-  // doesn't force-close.
-  useEffect(() => {
-    if (!openId) return
-    if (candidates.some((c) => c.id === openId)) return
-    const promoted = candidates.find((c) => c.tempId === openId)
-    setOpenId(promoted ? promoted.id : null)
-  }, [candidates, openId])
 
   const hasSegment = segmentId !== SEGMENT_NONE
   const canLaunch =
@@ -178,52 +162,6 @@ export function Recherche() {
     () => candidates.filter((c) => c.status !== 'pending'),
     [candidates],
   )
-
-  async function handleValidate(id: string) {
-    setBusyId(id)
-    try {
-      const res = await validate(id)
-      if (res.entreprise) ingestMany([res.entreprise])
-      if (res.prospect) addProspect(res.prospect)
-      setOpenId(null)
-      const nom = res.entreprise?.entreprise || res.prospect?.nom || 'Prospect'
-      toast.success(`${nom} ajouté à tes contacts — je complète sa fiche…`, {
-        action: { label: 'Voir', onClick: () => navigate('/contacts') },
-      })
-      // Background enrichment (fiche + contact) lands a few seconds after
-      // validate returns. Poll twice so the data shows up on its own.
-      const entrepriseId = res.entreprise?.id
-      const prospectId = res.prospect?.id
-      const refreshOnce = async () => {
-        try {
-          if (entrepriseId) ingestMany([await getEntreprise(entrepriseId)])
-          if (prospectId) replaceProspectLocal(await getProspect(prospectId))
-        } catch {
-          /* soft-fail */
-        }
-      }
-      window.setTimeout(refreshOnce, 8_000)
-      window.setTimeout(refreshOnce, 20_000)
-    } catch {
-      toast.error("Je n'ai pas réussi à l'ajouter — réessaie.")
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  async function handleRefuse(id: string) {
-    setBusyId(id)
-    try {
-      await refuse(id)
-      setOpenId(null)
-    } catch {
-      toast.error('Ça n’a pas marché — réessaie.')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const openCandidate = candidates.find((c) => c.id === openId) ?? null
 
   return (
     <>
@@ -406,24 +344,32 @@ export function Recherche() {
         </div>
       ) : pending.length > 0 || generating ? (
         <section className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold">
-              Nouveaux prospects à valider ({pending.length})
-            </h3>
-            <p className="text-muted-foreground text-xs">
-              Ouvre chaque proposition pour voir le détail, puis ajoute-la à
-              tes contacts ou écarte-la.
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">
+                {pending.length} prospect{pending.length > 1 ? 's' : ''} à
+                valider
+              </h3>
+              <p className="text-muted-foreground text-xs">
+                Je te les présente un par un — tu ajoutes ou tu écartes.
+              </p>
+            </div>
+            {pending.length > 0 ? (
+              <Button
+                onClick={() => openReview()}
+                className="gap-2 bg-violet-600 text-white hover:bg-violet-700"
+              >
+                Commencer la validation
+                <ArrowRight className="size-4" />
+              </Button>
+            ) : null}
           </div>
           <div className="flex flex-col gap-2">
             {pending.map((c) => (
               <CandidateCard
                 key={c.id}
                 candidate={c}
-                onOpen={() => setOpenId(c.id)}
-                onValidate={() => handleValidate(c.id)}
-                onRefuse={() => handleRefuse(c.id)}
-                busy={busyId === c.id}
+                onOpen={() => openReview(c.id)}
               />
             ))}
           </div>
@@ -452,7 +398,7 @@ export function Recherche() {
                 <CandidateCard
                   key={c.id}
                   candidate={c}
-                  onOpen={() => setOpenId(c.id)}
+                  onOpen={() => openReview(c.id)}
                 />
               ))}
             </div>
@@ -460,14 +406,10 @@ export function Recherche() {
         </section>
       ) : null}
 
-      <CandidateSheet
-        candidate={openCandidate}
-        open={!!openCandidate}
-        onOpenChange={(o) => !o && setOpenId(null)}
-        onPickContact={(i) => openCandidate && pickContact(openCandidate.id, i)}
-        onValidate={() => openCandidate && handleValidate(openCandidate.id)}
-        onRefuse={() => openCandidate && handleRefuse(openCandidate.id)}
-        busy={!!openCandidate && busyId === openCandidate.id}
+      <ValidationReview
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        initialId={reviewInitialId}
       />
 
       {/* Édition / création de segment sans quitter la page */}

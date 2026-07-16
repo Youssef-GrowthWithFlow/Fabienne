@@ -106,8 +106,16 @@ export type ActivityKind =
   | 'lost'
   | 'no_reply'
 
-export type { EntrepriseSummary, FieldSource } from '@/lib/entreprises'
-import type { EntrepriseSummary, FieldSource } from '@/lib/entreprises'
+export type {
+  EnrichmentStatus,
+  EntrepriseSummary,
+  FieldSource,
+} from '@/lib/entreprises'
+import type {
+  EnrichmentStatus,
+  EntrepriseSummary,
+  FieldSource,
+} from '@/lib/entreprises'
 
 export type Prospect = {
   id: string
@@ -126,6 +134,8 @@ export type Prospect = {
   relanceDate: string | null
   /** What to do at the next follow-up, in the user's words. */
   relanceNote: string
+  /** Personal-info enrichment lifecycle (email / téléphone / LinkedIn). */
+  enrichmentStatus: EnrichmentStatus
 }
 
 function toDate(iso: string): Date {

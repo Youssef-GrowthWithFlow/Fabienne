@@ -17,6 +17,7 @@ from app.schemas.entreprise import (
 from app.services.enrichment import (
     build_entreprise_fiche,
     complete_entreprise_fields,
+    extract_fiche_coordonnees,
 )
 
 logger = logging.getLogger(__name__)
@@ -131,11 +132,15 @@ async def regenerate_fiche_endpoint(
     try:
         html, _sources, _queries = await build_entreprise_fiche(entreprise, segment)
     except RuntimeError as exc:
+        entreprise.fiche_status = "error"
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
     except Exception as exc:
         logger.exception("Fiche regeneration failed for %r", entreprise_id)
+        entreprise.fiche_status = "error"
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Fiche regeneration failed: {exc}",
@@ -143,6 +148,27 @@ async def regenerate_fiche_endpoint(
 
     if html:
         entreprise.fiche_client = html
+        entreprise.fiche_status = "ready"
+        # Harvest the company's generic channels surfaced by the fiche
+        # (email d'accueil, standard, page LinkedIn) — best-effort.
+        try:
+            coords = await extract_fiche_coordonnees(
+                html, "", "", entreprise.entreprise
+            )
+            if coords is not None:
+                sources = dict(entreprise.field_sources or {})
+                if coords.entreprise_email.strip() and not entreprise.email:
+                    entreprise.email = coords.entreprise_email.strip()
+                    sources["email"] = "ai_grounding"
+                if coords.entreprise_telephone.strip() and not entreprise.telephone:
+                    entreprise.telephone = coords.entreprise_telephone.strip()
+                    sources["telephone"] = "ai_grounding"
+                if coords.entreprise_linkedin.strip() and not entreprise.linkedin:
+                    entreprise.linkedin = coords.entreprise_linkedin.strip()
+                    sources["linkedin"] = "ai_grounding"
+                entreprise.field_sources = sources
+        except Exception:  # noqa: BLE001
+            logger.exception("Coordonnées extraction failed for %r", entreprise_id)
         await db.commit()
         await db.refresh(entreprise)
     return entreprise

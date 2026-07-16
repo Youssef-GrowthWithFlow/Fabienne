@@ -18,6 +18,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/hooks/use-auth'
+import { useProspects } from '@/hooks/use-prospects'
+import { useSourcerHistory } from '@/hooks/use-sourcer-history'
+import { splitRelances } from '@/lib/prospects'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -82,8 +85,33 @@ function AvatarMenu() {
   )
 }
 
+/** Things waiting on the user today: due relances + candidates to validate. */
+function useTachesBadge(): number {
+  const { prospects, loading } = useProspects()
+  const { candidates } = useSourcerHistory()
+  if (loading) return 0
+  const { overdue, today } = splitRelances(prospects)
+  const pending = candidates.filter((c) => c.status === 'pending').length
+  return overdue.length + today.length + pending
+}
+
+function CountBadge({ count, className }: { count: number; className?: string }) {
+  if (count <= 0) return null
+  return (
+    <span
+      className={cn(
+        'flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-semibold leading-none text-white',
+        className,
+      )}
+    >
+      {count > 9 ? '9+' : count}
+    </span>
+  )
+}
+
 export function AppNav() {
   const { pathname } = useLocation()
+  const tachesBadge = useTachesBadge()
 
   return (
     <>
@@ -109,13 +137,16 @@ export function AppNav() {
                 key={item.url}
                 to={item.url}
                 className={cn(
-                  'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   isActivePath(pathname, item.url)
                     ? 'bg-muted text-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                 )}
               >
                 {item.title}
+                {item.url === '/taches' ? (
+                  <CountBadge count={tachesBadge} />
+                ) : null}
               </NavLink>
             ))}
           </nav>
@@ -140,7 +171,17 @@ export function AppNav() {
                   active ? 'text-foreground' : 'text-muted-foreground',
                 )}
               >
-                <item.icon className={cn('size-5', active && 'fill-current')} />
+                <span className="relative">
+                  <item.icon
+                    className={cn('size-5', active && 'fill-current')}
+                  />
+                  {item.url === '/taches' ? (
+                    <CountBadge
+                      count={tachesBadge}
+                      className="absolute -right-2.5 -top-1.5"
+                    />
+                  ) : null}
+                </span>
                 {item.title === 'Trouver des prospects' ? 'Trouver' : item.title}
               </NavLink>
             )

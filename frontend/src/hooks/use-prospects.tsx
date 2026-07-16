@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { toast } from 'sonner'
 
+import { fireConfetti } from '@/lib/confetti'
 import {
   todayIso,
   type Comment,
@@ -88,7 +89,32 @@ function emptyProspect(): Omit<Prospect, 'id'> {
     contactedAt: null,
     relanceDate: null,
     relanceNote: '',
+    enrichmentStatus: 'none',
   }
+}
+
+// Completing a task deserves better than « Action enregistrée » — a small
+// confetti burst + a warm message. Big burst for the milestones.
+const CELEBRATIONS: Partial<
+  Record<ActivityKind, { messages: string[]; big?: boolean }>
+> = {
+  message: {
+    messages: [
+      'Message envoyé — bien joué 💪',
+      'Et un contact de plus ✨',
+      'Ça, c’est fait 👏',
+    ],
+  },
+  reply: {
+    messages: ['Une réponse — ça mord ! 🎣', 'Excellente nouvelle 🙌'],
+  },
+  discussion: { messages: ['En discussion — continue comme ça 💬'] },
+  meeting: { messages: ['RDV pris 🤝 Superbe !'], big: true },
+  won: { messages: ['Client gagné 🏆 Bravo !'], big: true },
+}
+
+function pick<T>(list: T[]): T {
+  return list[Math.floor(Math.random() * list.length)]
 }
 
 export function ProspectsProvider({ children }: { children: ReactNode }) {
@@ -319,7 +345,13 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
           list.map((p) => (p.id === prospectId ? fresh : p)),
         )
         refreshActions()
-        toast.success('Action enregistrée')
+        const celebration = CELEBRATIONS[kind]
+        if (celebration) {
+          fireConfetti(celebration.big ? 'big' : 'small')
+          toast.success(pick(celebration.messages))
+        } else {
+          toast.success('C’est noté.')
+        }
       } catch {
         toast.error('Échec de l’action')
       }

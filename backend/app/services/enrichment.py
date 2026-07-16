@@ -62,7 +62,7 @@ ordre, **pas de h3**) :
 
 <h2>Signaux récents</h2>
 <ul>
-  <li>3 à 6 puces datées et sourcées. Privilégie les 12-24 derniers mois : levées de fonds (montant + date + investisseur), reprises / changements de capital, recrutements actifs (postes + volume), transferts / ouvertures de site, partenariats nouveaux, certifications obtenues, prix ou distinctions, contrats publics gagnés. Chaque puce = un fait vérifiable + sa source publique (Pappers, Maddyness, JOUE, registre, presse locale, site officiel…).</li>
+  <li>3 à 6 puces datées et sourcées. Privilégie les 12-24 derniers mois : levées de fonds (montant + date + investisseur), reprises / changements de capital, recrutements actifs (postes + volume), transferts / ouvertures de site, partenariats nouveaux, certifications obtenues, prix ou distinctions, contrats publics gagnés. **La source est OBLIGATOIRE et VISIBLE sur chaque puce** : termine chaque puce par « — Source : <a href="URL-exacte-de-la-page">Nom du média ou de la source, date</a> ». L'URL doit être celle de la page réellement consultée pendant ta recherche Google — jamais une URL devinée. Une puce dont tu ne peux pas citer la source exacte NE DOIT PAS apparaître.</li>
 </ul>
 
 <h2>Décideurs & contacts</h2>
@@ -76,7 +76,8 @@ ordre, **pas de h3**) :
 <p>2 à 3 phrases concrètes : <strong>pourquoi cette entreprise matche le segment</strong> (relie 1-2 signaux récents aux pain-points du brief) et <strong>sur quoi ouvrir le contact</strong> — un signal précis, un sujet d'actualité, un événement nommé. Si aucun angle n'émerge, dis-le explicitement (« Pas d'angle d'entrée évident à ce stade. »).</p>
 
 Règles strictes :
-1. **HTML uniquement**, exactement ces balises : <h2>, <p>, <ul>, <li>, <strong>, <em>. \
+1. **HTML uniquement**, exactement ces balises : <h2>, <p>, <ul>, <li>, <strong>, <em>, \
+   plus <a href="…"> UNIQUEMENT pour citer une source (section « Signaux récents » surtout). \
    PAS de <h3>, PAS de markdown, PAS de bloc de code, PAS de <html> / <body> / <doctype>.
 2. **Aucune hallucination**. Si une info n'est pas trouvée par la recherche, ne l'écris pas. \
    Mieux vaut une fiche plus courte et juste qu'une fiche longue et inventée. Pas de \
@@ -772,5 +773,113 @@ async def fetch_supplemental_contacts(
             "source": "ai_grounding_verified" if _is_verified(c.citation) else "ai_grounding",
         })
     return out, list(sources or [])
+
+
+# ---------------------------------------------------------------------------
+# Structured coordonnées extraction from a generated fiche
+# ---------------------------------------------------------------------------
+#
+# The fiche's « Décideurs & contacts » section already carries every public
+# channel the grounded search found (personal email / direct line / LinkedIn
+# for the decision-maker, plus the company's generic channels). This second
+# schema-bound agent (no tools — same chained-agent pattern as the contact
+# lookup above) turns that prose into structured fields so the prospect and
+# the entreprise records get filled without the user re-typing anything.
+# DropContact stays the fallback / verifier for what the web didn't yield.
+
+
+class FicheCoordonnees(BaseModel):
+    """Channels extracted from a fiche, personal vs company kept apart."""
+
+    contact_email: str = Field(
+        default="",
+        description=(
+            "Email PERSONNEL / nominatif du contact visé, uniquement s'il est "
+            "explicitement associé à cette personne dans la fiche. Jamais un "
+            "email générique (contact@, info@, accueil@…)."
+        ),
+    )
+    contact_telephone: str = Field(
+        default="",
+        description=(
+            "Ligne directe ou mobile du contact visé, uniquement si la fiche "
+            "l'attribue explicitement à cette personne."
+        ),
+    )
+    contact_linkedin: str = Field(
+        default="",
+        description="URL du profil LinkedIn PERSONNEL du contact visé (linkedin.com/in/…).",
+    )
+    entreprise_email: str = Field(
+        default="",
+        description=(
+            "Email générique de l'entreprise (contact@, info@, accueil@…) "
+            "mentionné dans la fiche."
+        ),
+    )
+    entreprise_telephone: str = Field(
+        default="",
+        description="Téléphone standard de l'entreprise mentionné dans la fiche.",
+    )
+    entreprise_linkedin: str = Field(
+        default="",
+        description="URL de la page LinkedIn de L'ENTREPRISE (linkedin.com/company/…).",
+    )
+
+
+async def extract_fiche_coordonnees(
+    fiche_html: str,
+    contact_nom: str,
+    contact_role: str,
+    entreprise_nom: str,
+) -> FicheCoordonnees | None:
+    """Schema-bound extraction of the channels present in a generated fiche.
+
+    Soft-fails to ``None`` — callers fall back to DropContact alone.
+    """
+    if not (fiche_html or "").strip():
+        return None
+    who = contact_nom.strip() or "(aucun contact nommé)"
+    if contact_role.strip():
+        who += f" ({contact_role.strip()})"
+    system = (
+        "Tu es un extracteur. On te donne la fiche HTML d'une entreprise. "
+        f"Le contact visé est : {who}. L'entreprise est : {entreprise_nom}. "
+        "Extrais UNIQUEMENT les coordonnées écrites noir sur blanc dans la "
+        "fiche, en séparant strictement les canaux PERSONNELS du contact visé "
+        "des canaux GÉNÉRIQUES de l'entreprise. Un email générique (contact@, "
+        "info@, accueil@, bonjour@…) va TOUJOURS dans entreprise_email, jamais "
+        "dans contact_email. N'attribue un canal au contact que si la fiche "
+        "l'associe explicitement à cette personne. N'INVENTE RIEN : champ "
+        "absent de la fiche = chaîne vide."
+    )
+    client = get_client()
+    config = types.GenerateContentConfig(
+        system_instruction=system,
+        temperature=0.0,
+        response_mime_type="application/json",
+        response_schema=FicheCoordonnees,
+        # Pure JSON shaping, no reasoning needed.
+        thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+        max_output_tokens=1024,
+    )
+    try:
+        response = await client.aio.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=fiche_html,
+            config=config,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("extract_fiche_coordonnees failed for %r", entreprise_nom)
+        return None
+    parsed = getattr(response, "parsed", None)
+    if isinstance(parsed, FicheCoordonnees):
+        return parsed
+    text = getattr(response, "text", "") or ""
+    try:
+        return FicheCoordonnees.model_validate_json(text)
+    except Exception:  # noqa: BLE001
+        logger.warning("extract_fiche_coordonnees: parse failed (head=%r)", text[:200])
+        return None
 
 

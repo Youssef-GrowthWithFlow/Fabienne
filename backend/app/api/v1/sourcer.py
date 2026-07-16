@@ -37,7 +37,10 @@ from app.schemas.sourced_candidate import (
 )
 from app.services import dropcontact
 from app.services.actions import log_action
-from app.services.enrichment import build_entreprise_fiche
+from app.services.enrichment import (
+    build_entreprise_fiche,
+    extract_fiche_coordonnees,
+)
 from app.services.sourcer import generate_entreprises
 
 router = APIRouter(prefix="/sourcer", tags=["sourcer"])
@@ -282,6 +285,8 @@ async def validate_candidate(
         origine="Sourcer IA",
         note=proposed.raison,
         signaux=list(proposed.signaux or []),
+        # The fiche generation starts right away in background — surface it.
+        fiche_status="generating",
         siren=proposed.siren,
         siret=proposed.siret,
         naf_code=proposed.naf_code,
@@ -315,6 +320,11 @@ async def validate_candidate(
             status="À contacter",
             created_at=date.today(),
             field_sources=init_sources,
+            # A fresh contact comes with its first task: reach out today.
+            relance_date=date.today(),
+            relance_note="le contacter",
+            # Personal-info enrichment (online + DropContact) starts now.
+            enrichment_status="generating",
         )
         db.add(prospect)
         await db.flush()
@@ -357,11 +367,17 @@ async def _enrich_after_validate(
     contact_nom: str,
     contact_role: str,
 ) -> None:
-    """Background enrichment: fiche (Gemini) + DropContact contact lookup.
+    """Background enrichment: fiche (Gemini) + coordonnées + DropContact.
 
     Opens its own DB session — the request-scoped session is gone by the
-    time this runs. Both calls are launched in parallel; each soft-fails
-    without crashing the other.
+    time this runs. Fiche and DropContact run in parallel; each soft-fails
+    without crashing the other. Personal channels found ONLINE (in the
+    grounded fiche) land first; DropContact fills the gaps and, being
+    verified, its nominative email wins over an AI-grounded one. Generic
+    channels (contact@, standard) go to the Entreprise, never the Prospect.
+
+    Lifecycle statuses (entreprise.fiche_status / prospect.enrichment_status)
+    are kept up to date so the frontend can show live loaders.
     """
     async with AsyncSessionLocal() as bg_db:
         try:
@@ -407,7 +423,9 @@ async def _enrich_after_validate(
             fiche_result = results[0]
             dc_result = results[1] if dc_task is not None else None
 
+            html = ""
             if isinstance(fiche_result, BaseException):
+                entreprise.fiche_status = "error"
                 logger.exception(
                     "Background fiche generation failed for entreprise %s",
                     entreprise_id, exc_info=fiche_result,
@@ -416,25 +434,42 @@ async def _enrich_after_validate(
                 html, _sources, _queries = fiche_result
                 if html:
                     entreprise.fiche_client = html
+                    entreprise.fiche_status = "ready"
+                else:
+                    entreprise.fiche_status = "error"
+            # The fiche is the long pole — commit it (and its status) as soon
+            # as it lands so the polling UI stops its loader without waiting
+            # for DropContact's slow poll window.
+            await bg_db.commit()
+
+            # Channels found online, straight from the grounded fiche.
+            if html:
+                coords = await extract_fiche_coordonnees(
+                    html, contact_nom, contact_role, entreprise.entreprise
+                )
+                if coords is not None:
+                    _apply_fiche_coordonnees(prospect, entreprise, coords)
 
             if (
                 prospect is not None
                 and dc_result is not None
                 and not isinstance(dc_result, BaseException)
             ):
-                _apply_dropcontact_to_prospect(prospect, dc_result)
+                _apply_dropcontact_to_prospect(prospect, dc_result, entreprise)
             elif isinstance(dc_result, BaseException):
                 logger.exception(
                     "Background DropContact enrichment failed for prospect %s",
                     prospect_id, exc_info=dc_result,
                 )
 
+            if prospect is not None:
+                prospect.enrichment_status = "ready"
             await bg_db.commit()
             logger.info(
                 "Background enrichment done for entreprise %s (prospect=%s, "
                 "fiche=%s, dropcontact=%s)",
                 entreprise_id, prospect_id,
-                "ok" if not isinstance(fiche_result, BaseException) else "fail",
+                "ok" if html else "fail",
                 "ok" if (
                     dc_task is not None
                     and not isinstance(dc_result, BaseException)
@@ -445,27 +480,100 @@ async def _enrich_after_validate(
                 "Background enrichment crashed for entreprise %s",
                 entreprise_id,
             )
+            # Best effort: never leave the UI on an infinite loader.
+            try:
+                async with AsyncSessionLocal() as err_db:
+                    ent = await err_db.get(Entreprise, entreprise_id)
+                    if ent is not None and ent.fiche_status == "generating":
+                        ent.fiche_status = "error"
+                    if prospect_id:
+                        pro = await err_db.get(Prospect, prospect_id)
+                        if pro is not None and pro.enrichment_status == "generating":
+                            pro.enrichment_status = "error"
+                    await err_db.commit()
+            except Exception:  # noqa: BLE001
+                logger.exception("Could not mark enrichment statuses as error")
+
+
+def _apply_fiche_coordonnees(
+    prospect: Prospect | None,
+    entreprise: Entreprise,
+    coords,
+) -> None:
+    """Fill EMPTY fields with channels found online (grounded fiche).
+
+    Personal channels → prospect, generic channels → entreprise. Never
+    overwrites a value already present, and tags provenance with
+    ``"ai_grounding"``.
+    """
+    if prospect is not None:
+        sources = dict(prospect.field_sources or {})
+        email = (coords.contact_email or "").strip()
+        if email and not prospect.email:
+            prospect.email = email
+            sources["email"] = "ai_grounding"
+        tel = (coords.contact_telephone or "").strip()
+        if tel and not prospect.telephone:
+            prospect.telephone = tel
+            sources["telephone"] = "ai_grounding"
+        linkedin = (coords.contact_linkedin or "").strip()
+        if linkedin and not prospect.linkedin:
+            prospect.linkedin = linkedin
+            sources["linkedin"] = "ai_grounding"
+        prospect.field_sources = sources
+
+    ent_sources = dict(entreprise.field_sources or {})
+    ent_email = (coords.entreprise_email or "").strip()
+    if ent_email and not entreprise.email:
+        entreprise.email = ent_email
+        ent_sources["email"] = "ai_grounding"
+    ent_tel = (coords.entreprise_telephone or "").strip()
+    if ent_tel and not entreprise.telephone:
+        entreprise.telephone = ent_tel
+        ent_sources["telephone"] = "ai_grounding"
+    ent_li = (coords.entreprise_linkedin or "").strip()
+    if ent_li and not entreprise.linkedin:
+        entreprise.linkedin = ent_li
+        ent_sources["linkedin"] = "ai_grounding"
+    entreprise.field_sources = ent_sources
 
 
 def _apply_dropcontact_to_prospect(
-    prospect: Prospect, dc: dropcontact.DropContactEnrichment,
+    prospect: Prospect,
+    dc: dropcontact.DropContactEnrichment,
+    entreprise: Entreprise | None = None,
 ) -> None:
     """Patch a Prospect in-place with DropContact enrichment.
 
     Only writes fields that DropContact actually returned, and tags each
     written field with ``"dropcontact"`` in ``field_sources``. ``email`` is
-    only accepted when the qualification is not ``"invalid"``.
+    only accepted when the qualification is not ``"invalid"``; a generic
+    inbox (``generic@pro`` — contact@, info@…) belongs to the entreprise,
+    not to the person. A verified nominative email overrides one that was
+    merely AI-grounded from the fiche.
     """
     sources = dict(prospect.field_sources or {})
-    if dc.email and dc.email_qualification != "invalid":
-        prospect.email = dc.email
-        sources["email"] = "dropcontact"
+    if dc.email and dc.email_qualification == "generic@pro":
+        if entreprise is not None and not entreprise.email:
+            entreprise.email = dc.email
+            ent_sources = dict(entreprise.field_sources or {})
+            ent_sources["email"] = "dropcontact"
+            entreprise.field_sources = ent_sources
+    elif dc.email and dc.email_qualification != "invalid":
+        ai_filled = sources.get("email") == "ai_grounding"
+        if not prospect.email or ai_filled:
+            prospect.email = dc.email
+            sources["email"] = "dropcontact"
     # Mobile phone wins over landline when both are present (more useful for
-    # outbound BtoB).
-    if dc.mobile_phone:
+    # outbound BtoB). Never clobbers a manually-entered number.
+    tel_overridable = not prospect.telephone or sources.get("telephone") in {
+        "ai_grounding",
+        "dropcontact",
+    }
+    if dc.mobile_phone and tel_overridable:
         prospect.telephone = dc.mobile_phone
         sources["telephone"] = "dropcontact"
-    elif dc.phone:
+    elif dc.phone and not prospect.telephone:
         prospect.telephone = dc.phone
         sources["telephone"] = "dropcontact"
     if dc.linkedin and not prospect.linkedin:

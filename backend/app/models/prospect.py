@@ -37,6 +37,12 @@ class Prospect(Base):
     # What to do at the next follow-up, in the user's words
     # (« envoyer ma proposition de projet »). Shown as the task sentence.
     relance_note: Mapped[str] = mapped_column(String, nullable=False, default="")
+    # Personal-info enrichment lifecycle: "none" | "generating" | "ready" |
+    # "error". Drives the loader on the contact's coordonnées while the
+    # online lookup + DropContact run after validation.
+    enrichment_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="none"
+    )
 
     entreprise: Mapped[Entreprise | None] = relationship(
         Entreprise,

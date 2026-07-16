@@ -61,7 +61,11 @@ import {
 } from '@/components/ui/tooltip'
 import { useEntreprises } from '@/hooks/use-entreprises'
 import { useProspects } from '@/hooks/use-prospects'
-import { regenerateEntrepriseFiche } from '@/lib/entreprises-api'
+import {
+  getEntreprise,
+  regenerateEntrepriseFiche,
+} from '@/lib/entreprises-api'
+import { getProspect as apiGetProspect } from '@/lib/prospects-api'
 import {
   STATUSES,
   formatDate,
@@ -429,11 +433,28 @@ function EntrepriseCard({ prospect }: { prospect: Prospect }) {
   const record = prospect.entrepriseId ? getById(prospect.entrepriseId) : undefined
   const summary = prospect.entreprise
 
-  if (!prospect.entrepriseId && !summary) return null
-
   const nom = record?.entreprise ?? summary?.entreprise ?? ''
   const fiche = record?.ficheClient ?? summary?.ficheClient ?? ''
   const signaux = record?.signaux ?? summary?.signaux ?? []
+  const ficheStatus = record?.ficheStatus ?? summary?.ficheStatus ?? 'none'
+  const ficheGenerating = !fiche && ficheStatus === 'generating'
+  const entrepriseId = prospect.entrepriseId
+
+  // While the background generation runs, poll so the fiche appears on its
+  // own the moment it's ready — no manual refresh.
+  useEffect(() => {
+    if (!ficheGenerating || !entrepriseId) return
+    const id = window.setInterval(async () => {
+      try {
+        ingestMany([await getEntreprise(entrepriseId)])
+      } catch {
+        /* keep polling */
+      }
+    }, 5_000)
+    return () => window.clearInterval(id)
+  }, [ficheGenerating, entrepriseId, ingestMany])
+
+  if (!prospect.entrepriseId && !summary) return null
 
   const handleRegenerate = async () => {
     if (!prospect.entrepriseId) return
@@ -503,6 +524,21 @@ function EntrepriseCard({ prospect }: { prospect: Prospect }) {
                   value={record.siteWeb}
                   onChange={(v) => updateEntreprise(record.id, { siteWeb: v })}
                   placeholder="https://…"
+                  displayClassName={INLINE_DISPLAY}
+                  emptyLabel="Vide"
+                />
+              </CoordRow>
+              <CoordRow
+                icon={Mail}
+                label="Email"
+                copyValue={record.email || null}
+                ai={isAiFilled(record.fieldSources, 'email', record.email)}
+              >
+                <InlineText
+                  type="email"
+                  value={record.email}
+                  onChange={(v) => updateEntreprise(record.id, { email: v })}
+                  placeholder="contact@exemple.fr"
                   displayClassName={INLINE_DISPLAY}
                   emptyLabel="Vide"
                 />
@@ -582,11 +618,28 @@ function EntrepriseCard({ prospect }: { prospect: Prospect }) {
             />
           ) : fiche ? (
             <FicheHtml html={fiche} />
+          ) : ficheGenerating ? (
+            <div className="flex flex-col gap-3 rounded-lg border border-violet-200/70 bg-violet-50/40 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+              <div className="flex items-center gap-2 text-sm font-medium text-violet-700 dark:text-violet-300">
+                <Loader2 className="size-4 animate-spin" />
+                Je prépare la fiche complète…
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Activité, actualité, décideurs, coordonnées — j'analyse le web
+                en ce moment. Elle s'affichera ici toute seule dans un instant.
+              </p>
+              <div className="space-y-2">
+                <div className="bg-violet-100 dark:bg-violet-950/60 h-3 w-full animate-pulse rounded" />
+                <div className="bg-violet-100 dark:bg-violet-950/60 h-3 w-4/5 animate-pulse rounded" />
+                <div className="bg-violet-100 dark:bg-violet-950/60 h-3 w-3/5 animate-pulse rounded" />
+              </div>
+            </div>
           ) : (
             <div className="bg-muted/20 flex flex-col items-center gap-2 rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
               <p>
-                Pas encore de fiche — je peux en préparer une complète
-                (activité, actualité, décideurs, coordonnées).
+                {ficheStatus === 'error'
+                  ? 'La préparation de la fiche a échoué — on retente ?'
+                  : 'Pas encore de fiche — je peux en préparer une complète (activité, actualité, décideurs, coordonnées).'}
               </p>
               <Button
                 size="sm"
@@ -679,6 +732,7 @@ export function ContactSheet({
     updateComment,
     deleteComment,
     logAction,
+    replaceProspectLocal,
     actions: allActions,
   } = useProspects()
 
@@ -691,6 +745,21 @@ export function ContactSheet({
     setEditingCommentId(null)
     setQuickLogOpen(false)
   }, [prospect.id])
+
+  // While the personal-info lookup (web + DropContact) runs in background,
+  // poll the prospect so email / téléphone / LinkedIn land on their own.
+  const enriching = prospect.enrichmentStatus === 'generating'
+  useEffect(() => {
+    if (!enriching) return
+    const id = window.setInterval(async () => {
+      try {
+        replaceProspectLocal(await apiGetProspect(prospect.id))
+      } catch {
+        /* keep polling */
+      }
+    }, 5_000)
+    return () => window.clearInterval(id)
+  }, [enriching, prospect.id, replaceProspectLocal])
 
   const comments = useMemo(
     () => sortComments(prospect.comments),
@@ -814,6 +883,13 @@ export function ContactSheet({
         <div className="space-y-4">
           <Card title={<>Coordonnées</>}>
             <div className="space-y-3">
+              {enriching ? (
+                <div className="flex items-center gap-2 rounded-md bg-violet-50 px-3 py-2 text-xs text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                  Je cherche ses coordonnées — email, téléphone direct,
+                  LinkedIn. Elles apparaîtront ici toutes seules.
+                </div>
+              ) : null}
               <div className="flex gap-2">
                 <ContactBigButton
                   icon={Mail}

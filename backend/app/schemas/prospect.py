@@ -23,6 +23,7 @@ class ProspectBase(BaseModel):
     contacted_at: date | None = Field(default=None, alias="contactedAt")
     relance_date: date | None = Field(default=None, alias="relanceDate")
     relance_note: str = Field(default="", alias="relanceNote")
+    enrichment_status: str = Field(default="none", alias="enrichmentStatus")
 
 
 class ProspectCreate(ProspectBase):

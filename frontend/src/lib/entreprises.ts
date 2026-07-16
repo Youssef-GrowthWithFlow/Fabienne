@@ -16,6 +16,9 @@ export type Dirigeant = {
   qualite: string
 }
 
+/** Lifecycle of a background enrichment (fiche IA, coordonnées perso). */
+export type EnrichmentStatus = 'none' | 'generating' | 'ready' | 'error'
+
 export type EntrepriseRecord = {
   id: string
   segmentId: Segment | null
@@ -31,6 +34,10 @@ export type EntrepriseRecord = {
   signaux: string[]
   note: string
   ficheClient: string
+  ficheStatus: EnrichmentStatus
+  /** Generic company inbox (contact@, info@…) — distinct from the
+   *  prospect's personal email. */
+  email: string
   siren: string | null
   siret: string | null
   nafCode: string | null
@@ -56,6 +63,7 @@ export type EntrepriseSummary = {
   ville: string
   segmentId: Segment | null
   ficheClient: string
+  ficheStatus: EnrichmentStatus
   signaux: string[]
 }
 

@@ -43,6 +43,10 @@ class Entreprise(Base):
     # EntrepriseSheet or the fiche-editor agent.
     fiche_client: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
+    # Fiche lifecycle: "none" | "generating" | "ready" | "error". Drives the
+    # loader shown on the contact sheet while the background generation runs.
+    fiche_status: Mapped[str] = mapped_column(String, nullable=False, default="none")
+
     # API Entreprise (recherche-entreprises.api.gouv.fr) — structured identity.
     siren: Mapped[str | None] = mapped_column(String(9), nullable=True, index=True)
     siret: Mapped[str | None] = mapped_column(String(14), nullable=True, index=True)
@@ -51,6 +55,10 @@ class Entreprise(Base):
     effectif: Mapped[str | None] = mapped_column(String, nullable=True)
     date_creation: Mapped[date | None] = mapped_column(Date, nullable=True)
     dirigeants: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Generic company channels — distinct from the prospect's personal ones.
+    # email = contact@ / info@… (fiche extraction or DropContact generic@pro).
+    email: Mapped[str] = mapped_column(String, nullable=False, default="")
 
     # Google Places API enrichment — phone, GPS, rating, reviews, Maps URL.
     telephone: Mapped[str] = mapped_column(String, nullable=False, default="")

@@ -31,6 +31,10 @@ class EntrepriseBase(BaseModel):
     signaux: list[str] = Field(default_factory=list)
     note: str = ""
     fiche_client: str = Field(default="", alias="ficheClient")
+    fiche_status: str = Field(default="none", alias="ficheStatus")
+
+    # Generic company channels
+    email: str = ""
 
     # API gouv structured identity
     siren: str | None = None
@@ -76,6 +80,8 @@ class EntrepriseUpdate(BaseModel):
     signaux: list[str] | None = None
     note: str | None = None
     fiche_client: str | None = Field(default=None, alias="ficheClient")
+    fiche_status: str | None = Field(default=None, alias="ficheStatus")
+    email: str | None = None
     siren: str | None = None
     siret: str | None = None
     naf_code: str | None = Field(default=None, alias="nafCode")
@@ -112,6 +118,7 @@ class EntrepriseSummary(BaseModel):
     ville: str = ""
     segment_id: str | None = Field(default=None, serialization_alias="segmentId")
     fiche_client: str = Field(default="", alias="ficheClient")
+    fiche_status: str = Field(default="none", alias="ficheStatus")
     signaux: list[str] = Field(default_factory=list)
 
 

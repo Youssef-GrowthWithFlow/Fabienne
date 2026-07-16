@@ -1,21 +1,27 @@
 import {
+  ArrowRight,
   CalendarDays,
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
+  Flame,
   List,
   PartyPopper,
+  Sparkles,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { ContactSheet } from '@/components/contact-sheet'
 import { QuickLogDrawer } from '@/components/quick-log-drawer'
 import { RelanceRow } from '@/components/relance-row'
+import { ValidationReview } from '@/components/validation-review'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useProspects } from '@/hooks/use-prospects'
+import { useSourcerHistory } from '@/hooks/use-sourcer-history'
+import { fireConfetti } from '@/lib/confetti'
 import {
   formatDate,
   isRelanceOverdue,
@@ -264,21 +270,49 @@ function PlanningView({
 }
 
 export function Taches() {
-  const { prospects, loading, getProspect, updateProspect } = useProspects()
+  const { prospects, actions, loading, getProspect, updateProspect } =
+    useProspects()
+  const { candidates } = useSourcerHistory()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [quickLogId, setQuickLogId] = useState<string | null>(null)
   const [view, setView] = useState<TachesView>('liste')
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   const { overdue, today, upcoming, later } = useMemo(
     () => splitRelances(prospects),
     [prospects],
   )
   const aPlanifier = useMemo(() => sansRelance(prospects), [prospects])
+  const aValider = useMemo(
+    () => candidates.filter((c) => c.status === 'pending').length,
+    [candidates],
+  )
+  // Little fire counter: actions logged today (excluding auto « created »).
+  const doneToday = useMemo(() => {
+    const todayStr = new Date().toDateString()
+    return actions.filter(
+      (a) => a.kind !== 'created' && new Date(a.at).toDateString() === todayStr,
+    ).length
+  }, [actions])
 
   const selected = selectedId ? (getProspect(selectedId) ?? null) : null
   const quickLogProspect = quickLogId ? (getProspect(quickLogId) ?? null) : null
   const totalPlanned =
     overdue.length + today.length + upcoming.length + later.length
+
+  // Big moment: the last due task of the day just got done.
+  const dueCount = overdue.length + today.length
+  const prevDue = useRef<number | null>(null)
+  useEffect(() => {
+    if (loading) return
+    if (prevDue.current !== null && prevDue.current > 0 && dueCount === 0) {
+      fireConfetti('big')
+      toast.success('Toutes tes tâches du jour sont faites 🎉', {
+        description: 'Belle journée de prospection — à demain !',
+      })
+    }
+    prevDue.current = dueCount
+  }, [dueCount, loading])
 
   const renderRows = (list: Prospect[], isOverdue = false) =>
     list.map((p) => (
@@ -295,7 +329,17 @@ export function Taches() {
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Tes tâches</h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Tes tâches
+            </h2>
+            {doneToday > 0 ? (
+              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                <Flame className="size-3.5" />
+                {doneToday} aujourd'hui
+              </span>
+            ) : null}
+          </div>
           <p className="text-muted-foreground mt-1 text-sm">
             Toutes tes relances au même endroit — fais, repousse ou planifie.
           </p>
@@ -324,6 +368,31 @@ export function Taches() {
           ))}
         </div>
       </div>
+
+      {/* Prospects sourcés en attente de validation */}
+      {aValider > 0 ? (
+        <section className="flex flex-wrap items-center gap-3 rounded-xl border border-violet-200/70 bg-violet-50/50 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+          <div className="bg-violet-100 text-violet-600 dark:bg-violet-950 dark:text-violet-300 flex size-10 shrink-0 items-center justify-center rounded-full">
+            <Sparkles className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1 basis-52">
+            <div className="text-base font-semibold">
+              {aValider} prospect{aValider > 1 ? 's' : ''} à valider
+            </div>
+            <p className="text-muted-foreground text-sm">
+              J'ai trouvé des prospects pour toi — ajoute-les à tes contacts
+              ou écarte-les.
+            </p>
+          </div>
+          <Button
+            onClick={() => setReviewOpen(true)}
+            className="gap-2 bg-violet-600 text-white hover:bg-violet-700"
+          >
+            Les valider
+            <ArrowRight className="size-4" />
+          </Button>
+        </section>
+      ) : null}
 
       {loading ? (
         <div className="space-y-3">
@@ -402,6 +471,11 @@ export function Taches() {
           ) : null}
         </>
       )}
+
+      <ValidationReview
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+      />
 
       <QuickLogDrawer
         prospect={quickLogProspect}
