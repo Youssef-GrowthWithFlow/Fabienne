@@ -30,8 +30,8 @@ export function SourcingProgress({ phases, recovering }: Props) {
         <div className="font-medium text-foreground">{headline}</div>
         <div className="mt-0.5 text-[12px] text-muted-foreground">
           {recovering
-            ? 'Tu peux fermer l’onglet, je te montre les leads dès qu’ils arrivent.'
-            : `${liveMessage} — compte 1 à 2 minutes. Tu peux fermer l’onglet, je continue et les leads apparaîtront ici.`}
+            ? 'Tu peux fermer l’onglet, je te montre les prospects dès qu’ils arrivent.'
+            : `${liveMessage} — compte 1 à 2 minutes. Tu peux fermer l’onglet, je continue et les prospects apparaîtront ici.`}
         </div>
       </div>
     </div>

@@ -223,7 +223,7 @@ export function SourcerProvider({ children }: { children: ReactNode }) {
           activeMarkerRef.current = null
           setRecovering(false)
           toast.success(
-            `${newOnes.length} nouveau${newOnes.length > 1 ? 'x' : ''} lead${
+            `${newOnes.length} nouveau${newOnes.length > 1 ? 'x' : ''} prospect${
               newOnes.length > 1 ? 's' : ''
             } prêt${newOnes.length > 1 ? 's' : ''} !`,
           )

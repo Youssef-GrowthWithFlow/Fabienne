@@ -17,7 +17,6 @@ import { InlineText } from '@/components/inline-text'
 import { Input } from '@/components/ui/input'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TagsField } from '@/components/tags-field'
 import { useSegments } from '@/hooks/use-segments'
 import type { Segment } from '@/lib/prospects'
@@ -40,9 +39,9 @@ function NotesSection({
   const isEmpty = !value.replace(/<[^>]*>/g, '').trim()
   const effectiveEditing = editing || isEmpty
   return (
-    <section className="flex flex-col gap-3 border-t pt-5">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold">Notes libres</h3>
+        <span className="text-sm font-medium">Notes libres</span>
         {isEmpty ? null : effectiveEditing ? (
           <Button
             size="sm"
@@ -70,20 +69,28 @@ function NotesSection({
         editable={effectiveEditing}
         placeholder={placeholder}
       />
-    </section>
+    </div>
   )
 }
 
+/** Section = plain-French question + one line saying why it matters. */
 function Section({
   title,
+  hint,
   children,
 }: {
   title: string
+  hint?: string
   children: ReactNode
 }) {
   return (
-    <section className="flex flex-col gap-4 border-t pt-5 first:border-t-0 first:pt-0">
-      <h3 className="text-sm font-semibold">{title}</h3>
+    <section className="flex flex-col gap-4 border-t pt-6 first:border-t-0 first:pt-0">
+      <div>
+        <h3 className="text-base font-semibold">{title}</h3>
+        {hint ? (
+          <p className="text-muted-foreground mt-0.5 text-sm">{hint}</p>
+        ) : null}
+      </div>
       <div className="flex flex-col gap-4">{children}</div>
     </section>
   )
@@ -125,7 +132,7 @@ function AISourcesField({
           />
           <Input
             value={src.description}
-            placeholder="Annuaire officiel, registre…"
+            placeholder="C'est quoi ce site ?"
             onChange={(e) => update(i, { description: e.target.value })}
             onBlur={pruneEmptyOnBlur}
             className="flex-1"
@@ -148,12 +155,11 @@ function AISourcesField({
         className="self-start"
         onClick={add}
       >
-        + Ajouter une source
+        + Ajouter un site
       </Button>
     </div>
   )
 }
-
 
 function DataSourcesField({
   values,
@@ -241,7 +247,7 @@ export function SegmentSheet({ segment, onClose }: Props) {
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="flex !w-full flex-col gap-0 p-0 sm:!max-w-none lg:!w-[60vw]"
+        className="flex !w-full flex-col gap-0 p-0 sm:!max-w-none lg:!w-[46rem]"
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2 py-2">
           <Button
@@ -258,174 +264,158 @@ export function SegmentSheet({ segment, onClose }: Props) {
           </span>
         </div>
 
-        <Tabs
-          defaultValue="cible"
-          className="flex min-h-0 flex-1 flex-col gap-0"
-        >
-          <div className="border-b px-6 sm:px-10 pt-3 pb-2">
-            <TabsList>
-              <TabsTrigger value="cible">Cible</TabsTrigger>
-              <TabsTrigger value="offre">Offre</TabsTrigger>
-            </TabsList>
-          </div>
+        {/* One scrollable form — nothing behind tabs, each section is a plain
+            question with a hint explaining what the AI does with it. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-10">
+          <div className="flex flex-col gap-8">
+            <Section
+              title="Ce segment"
+              hint="Un segment = un type de client que tu vises. Tout ce que tu remplis ici guide la recherche de prospects."
+            >
+              <FormRow label="Nom">
+                <InlineText
+                  value={brief.nom}
+                  onChange={(v) => set('nom', v)}
+                  placeholder={segment}
+                />
+              </FormRow>
+              <FormRow label="Description">
+                <InlineText
+                  value={brief.description}
+                  onChange={(v) => set('description', v)}
+                  placeholder="En une phrase : qui c'est, et pourquoi c'est intéressant pour toi."
+                  multiline
+                />
+              </FormRow>
+            </Section>
 
-          <TabsContent
-            value="cible"
-            className="min-h-0 flex-1 overflow-y-auto px-6 sm:px-10 py-6"
-          >
-            <div className="flex flex-col gap-6">
-              <Section title="Identité">
-                <FormRow label="Nom">
-                  <InlineText
-                    value={brief.nom}
-                    onChange={(v) => set('nom', v)}
-                    placeholder={segment}
-                  />
-                </FormRow>
-                <FormRow label="Description">
-                  <InlineText
-                    value={brief.description}
-                    onChange={(v) => set('description', v)}
-                    placeholder="Ajouter une description"
-                    multiline
-                  />
-                </FormRow>
-              </Section>
+            <Section
+              title="Qui veux-tu viser ?"
+              hint="C'est le portrait-robot : l'IA cherche des établissements qui ressemblent à ça."
+            >
+              <FormRow label="Leur métier / rôle">
+                <TagsField
+                  values={brief.postes}
+                  onChange={(v) => set('postes', v)}
+                  placeholder="Ex : Pharmacien titulaire"
+                />
+              </FormRow>
+              <FormRow label="Taille de la structure">
+                <InlineText
+                  value={brief.tailleStructure}
+                  onChange={(v) => set('tailleStructure', v)}
+                  placeholder="Ex : 2 à 5 salariés"
+                />
+              </FormRow>
+              <FormRow label="Type d'activité">
+                <TagsField
+                  values={brief.activiteCiblee}
+                  onChange={(v) => set('activiteCiblee', v)}
+                  placeholder="Ex : Officine indépendante"
+                />
+              </FormRow>
+              <FormRow label="Où ?">
+                <TagsField
+                  values={brief.zoneGeographique}
+                  onChange={(v) => set('zoneGeographique', v)}
+                  placeholder="Ex : Agglomération toulousaine"
+                />
+              </FormRow>
+            </Section>
 
-              <Section title="À qui on parle">
-                <FormRow label="Intitulé de poste">
-                  <TagsField
-                    values={brief.postes}
-                    onChange={(v) => set('postes', v)}
-                    placeholder="Ex : Pharmacien titulaire"
-                  />
-                </FormRow>
-                <FormRow label="Taille">
-                  <InlineText
-                    value={brief.tailleStructure}
-                    onChange={(v) => set('tailleStructure', v)}
-                    placeholder="Ex : 2 à 5 salariés"
-                  />
-                </FormRow>
-                <FormRow label="Activité ciblée">
-                  <TagsField
-                    values={brief.activiteCiblee}
-                    onChange={(v) => set('activiteCiblee', v)}
-                    placeholder="Ex : Officine indépendante"
-                  />
-                </FormRow>
-                <FormRow label="Zone géographique">
-                  <TagsField
-                    values={brief.zoneGeographique}
-                    onChange={(v) => set('zoneGeographique', v)}
-                    placeholder="Ex : Agglomération toulousaine"
-                  />
-                </FormRow>
-              </Section>
+            <Section
+              title="À quoi reconnaît-on un bon prospect ?"
+              hint="L'IA privilégie ceux qui montrent ces signes, et écarte ceux qui montrent les mauvais."
+            >
+              <FormRow label="Les signes qui donnent envie">
+                <TagsField
+                  values={brief.mustHave}
+                  onChange={(v) => set('mustHave', v)}
+                  placeholder="Ex : Reprise récente de l'officine"
+                />
+              </FormRow>
+              <FormRow label="Un plus, sans être obligatoire">
+                <TagsField
+                  values={brief.shouldHave}
+                  onChange={(v) => set('shouldHave', v)}
+                  placeholder="Ex : Présent sur les réseaux"
+                />
+              </FormRow>
+              <FormRow label="À éviter absolument">
+                <TagsField
+                  values={brief.redFlags}
+                  onChange={(v) => set('redFlags', v)}
+                  placeholder="Ex : Grande chaîne nationale"
+                />
+              </FormRow>
+              <FormRow label="Leurs problèmes du quotidien">
+                <TagsField
+                  values={brief.painPoints}
+                  onChange={(v) => set('painPoints', v)}
+                  placeholder="Ex : Manque de temps pour recruter"
+                />
+              </FormRow>
+            </Section>
 
-              <Section title="Ce qui leur pose problème">
-                <FormRow label="Problèmes">
-                  <TagsField
-                    values={brief.painPoints}
-                    onChange={(v) => set('painPoints', v)}
-                  />
-                </FormRow>
-              </Section>
-
-              <Section title="Signaux">
-                <FormRow label="Must have">
-                  <TagsField
-                    values={brief.mustHave}
-                    onChange={(v) => set('mustHave', v)}
-                    placeholder="Ex : Vient de prendre son poste"
-                  />
-                </FormRow>
-                <FormRow label="Should have">
-                  <TagsField
-                    values={brief.shouldHave}
-                    onChange={(v) => set('shouldHave', v)}
-                  />
-                </FormRow>
-                <FormRow label="Red flag">
-                  <TagsField
-                    values={brief.redFlags}
-                    onChange={(v) => set('redFlags', v)}
-                  />
-                </FormRow>
-              </Section>
-
-              <Section title="Pistes pour chercher">
-                <FormRow label="Sources utiles">
-                  <TagsField
-                    values={brief.sources}
-                    onChange={(v) => set('sources', v)}
-                    placeholder="Ex : LinkedIn Sales Navigator"
-                  />
-                </FormRow>
-              </Section>
-
-              <Section title="Sources web pour l'IA">
-                <p className="text-xs text-muted-foreground">
-                  URL + description. L'IA peut s'en servir lors du sourcing
-                  (à sa discrétion).
-                </p>
+            <Section
+              title="Où l'IA doit chercher"
+              hint="Donne-lui tes meilleurs annuaires et sites : elle s'en sert pour trouver et vérifier les prospects."
+            >
+              <FormRow label="Sites web de confiance">
                 <AISourcesField
                   values={brief.aiSources}
                   onChange={(v) => set('aiSources', v)}
                 />
-              </Section>
-
-              <Section title="Bases de données externes">
+              </FormRow>
+              <FormRow label="Annuaires officiels">
                 <DataSourcesField
                   values={brief.dataSources}
                   onChange={(v) => set('dataSources', v)}
                 />
-              </Section>
-            </div>
-          </TabsContent>
+              </FormRow>
+              <FormRow label="Autres pistes (pour toi)">
+                <TagsField
+                  values={brief.sources}
+                  onChange={(v) => set('sources', v)}
+                  placeholder="Ex : LinkedIn, salon professionnel…"
+                />
+              </FormRow>
+            </Section>
 
-          <TabsContent
-            value="offre"
-            className="min-h-0 flex-1 overflow-y-auto px-6 sm:px-10 py-6"
-          >
-            <div className="flex flex-col gap-6">
-              <Section title="Notre promesse">
-                <FormRow label="En une phrase">
-                  <InlineText
-                    value={brief.pitch}
-                    onChange={(v) => set('pitch', v)}
-                    placeholder="Ce qu’on leur apporte, sans jargon"
-                    multiline
-                  />
-                </FormRow>
-              </Section>
-
-              <Section title="Pourquoi ça marche">
-                <FormRow label="Bénéfices">
-                  <TagsField
-                    values={brief.benefices}
-                    onChange={(v) => set('benefices', v)}
-                    placeholder="Un bénéfice concret"
-                  />
-                </FormRow>
-                <FormRow label="Preuves">
-                  <TagsField
-                    values={brief.preuves}
-                    onChange={(v) => set('preuves', v)}
-                    placeholder="Chiffre, cas client, logo"
-                  />
-                </FormRow>
-              </Section>
-
+            <Section
+              title="Ton offre pour eux"
+              hint="Sert à préparer les fiches et tes messages : ce que tu leur apportes, avec quelles preuves."
+            >
+              <FormRow label="En une phrase">
+                <InlineText
+                  value={brief.pitch}
+                  onChange={(v) => set('pitch', v)}
+                  placeholder="Ce qu'on leur apporte, sans jargon"
+                  multiline
+                />
+              </FormRow>
+              <FormRow label="Bénéfices concrets">
+                <TagsField
+                  values={brief.benefices}
+                  onChange={(v) => set('benefices', v)}
+                  placeholder="Un bénéfice concret"
+                />
+              </FormRow>
+              <FormRow label="Preuves">
+                <TagsField
+                  values={brief.preuves}
+                  onChange={(v) => set('preuves', v)}
+                  placeholder="Chiffre, cas client, logo"
+                />
+              </FormRow>
               <NotesSection
                 value={brief.notes}
                 onChange={(html) => set('notes', html)}
                 placeholder="Écris tout ce qui peut décrire ton offre…"
               />
-            </div>
-          </TabsContent>
-
-        </Tabs>
+            </Section>
+          </div>
+        </div>
 
         <div className="flex shrink-0 flex-col gap-2 border-t px-6 sm:px-10 py-3">
           <Button

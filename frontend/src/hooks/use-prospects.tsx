@@ -20,23 +20,38 @@ import {
   listProspects as apiListProspects,
   updateProspect as apiUpdateProspect,
 } from '@/lib/prospects-api'
-import { createAction as apiCreateAction } from '@/lib/actions-api'
+import {
+  createAction as apiCreateAction,
+  listActions as apiListActions,
+  type ActionRecord,
+} from '@/lib/actions-api'
 import type { ActivityKind } from '@/lib/prospects'
 import {
   createComment as apiCreateComment,
   deleteComment as apiDeleteComment,
   updateComment as apiUpdateComment,
 } from '@/lib/comments-api'
-import { useActions } from '@/hooks/use-actions'
+
+const ACTIONS_HISTORY_DAYS = 90
+
+function actionsSinceIso(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - ACTIONS_HISTORY_DAYS)
+  return d.toISOString()
+}
 
 type ProspectsContextValue = {
   prospects: Prospect[]
+  actions: ActionRecord[]
   loading: boolean
   getProspect: (id: string) => Prospect | undefined
   updateProspect: (next: Prospect) => void
   replaceProspectLocal: (next: Prospect) => void
   createProspect: (
-    input?: Partial<Omit<Prospect, 'id' | 'comments'>>,
+    input?: Partial<Omit<Prospect, 'id' | 'comments'>> & {
+      /** Free-text company name — the backend finds or creates it. */
+      entrepriseNom?: string
+    },
   ) => Promise<string | null>
   addProspect: (prospect: Prospect) => void
   deleteProspect: (id: string) => void
@@ -72,13 +87,23 @@ function emptyProspect(): Omit<Prospect, 'id'> {
     createdAt: todayIso(),
     contactedAt: null,
     relanceDate: null,
+    relanceNote: '',
   }
 }
 
 export function ProspectsProvider({ children }: { children: ReactNode }) {
   const [prospects, setProspects] = useState<Prospect[]>([])
+  const [actions, setActions] = useState<ActionRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const { refresh: refreshActions } = useActions()
+
+  const refreshActions = useCallback(async () => {
+    try {
+      const data = await apiListActions({ since: actionsSinceIso() })
+      setActions(data)
+    } catch {
+      // ignore — the feed refreshes on the next mutation
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -92,6 +117,11 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+    apiListActions({ since: actionsSinceIso() })
+      .then((data) => {
+        if (!cancelled) setActions(data)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -146,7 +176,9 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
 
   const createProspect = useCallback(
     async (
-      input?: Partial<Omit<Prospect, 'id' | 'comments'>>,
+      input?: Partial<Omit<Prospect, 'id' | 'comments'>> & {
+        entrepriseNom?: string
+      },
     ): Promise<string | null> => {
       try {
         const draft = { ...emptyProspect(), ...input, id: '' } as Prospect
@@ -298,6 +330,7 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ProspectsContextValue>(
     () => ({
       prospects,
+      actions,
       loading,
       getProspect,
       updateProspect,
@@ -312,6 +345,7 @@ export function ProspectsProvider({ children }: { children: ReactNode }) {
     }),
     [
       prospects,
+      actions,
       loading,
       getProspect,
       updateProspect,

@@ -1,15 +1,17 @@
 import {
+  Briefcase,
   Check,
   ExternalLink,
   Loader2,
   Map as MapIcon,
+  MapPin,
   Phone,
   Star,
+  Users,
   X,
 } from 'lucide-react'
 
 import { SignalBadge } from '@/components/signal-badge'
-import { WithSourceTooltip } from '@/components/with-source-tooltip'
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
@@ -42,7 +44,6 @@ export function CandidateSheet({
   busy,
 }: Props) {
   if (!candidate) return null
-  const sources = candidate.fieldSources
   const isDone =
     candidate.status === 'validated' || candidate.status === 'refused'
   // Streaming candidates have a temp_id, not a persisted SourcedCandidate.id
@@ -57,7 +58,9 @@ export function CandidateSheet({
     .filter(Boolean)
     .join(' — ')
 
-  const taille = candidate.effectif || candidate.taille || ''
+  // INSEE renvoie « NN » quand l'effectif n'est pas renseigné — pas parlant.
+  const rawTaille = candidate.effectif || candidate.taille || ''
+  const taille = rawTaille === 'NN' ? '' : rawTaille
   const secteur = candidate.secteur || candidate.nafLabel || ''
   const rating = candidate.googleRating
   const ratingCount = candidate.googleRatingCount
@@ -67,16 +70,65 @@ export function CandidateSheet({
       <SheetContent className="flex !w-full flex-col gap-0 overflow-hidden p-0 sm:!max-w-xl">
         <SheetHeader className="gap-1 border-b px-4 py-3">
           <SheetTitle className="text-base font-medium leading-snug">
-            <WithSourceTooltip source={sources?.entreprise}>
-              {candidate.entreprise || 'Sans nom'}
-            </WithSourceTooltip>
+            {candidate.entreprise || 'Sans nom'}
           </SheetTitle>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-4 pb-6 pt-4">
-          {/* Signaux + explication ------------------------------------- */}
+          {/* Résumé — l'essentiel d'un coup d'œil avant de décider */}
+          <div className="bg-muted/30 mb-4 grid grid-cols-2 gap-3 rounded-xl border p-3 sm:grid-cols-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                Avis Google
+              </span>
+              {rating != null ? (
+                <span className="flex items-center gap-1 text-lg font-semibold tabular-nums">
+                  <Star className="size-4 fill-amber-400 text-amber-400" />
+                  {rating.toFixed(1)}
+                  {ratingCount != null ? (
+                    <span className="text-muted-foreground text-xs font-normal">
+                      ({ratingCount})
+                    </span>
+                  ) : null}
+                </span>
+              ) : (
+                <span className="text-muted-foreground text-sm">—</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                Ville
+              </span>
+              <span className="flex items-center gap-1 truncate text-sm font-medium">
+                <MapPin className="text-muted-foreground size-3.5 shrink-0" />
+                {candidate.ville || '—'}
+              </span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                Taille
+              </span>
+              <span className="flex items-center gap-1 truncate text-sm font-medium">
+                <Users className="text-muted-foreground size-3.5 shrink-0" />
+                {taille || '—'}
+              </span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                Secteur
+              </span>
+              <span
+                className="flex items-center gap-1 truncate text-sm font-medium"
+                title={secteur}
+              >
+                <Briefcase className="text-muted-foreground size-3.5 shrink-0" />
+                {secteur || '—'}
+              </span>
+            </div>
+          </div>
+
           {candidate.signaux && candidate.signaux.length > 0 && (
-            <Block label="Signaux">
+            <Block label="Pourquoi elle est intéressante">
               <div className="flex flex-wrap gap-1.5">
                 {candidate.signaux.map((s, i) => (
                   <SignalBadge key={i}>{s}</SignalBadge>
@@ -86,43 +138,19 @@ export function CandidateSheet({
           )}
 
           {candidate.raison && (
-            <Block label="Description">
+            <Block label="En deux mots">
               <p className="text-sm leading-relaxed text-foreground">
                 {candidate.raison}
               </p>
             </Block>
           )}
 
-          {/* Identité ------------------------------------------------- */}
           {address && (
             <Block label="Adresse">
-              <WithSourceTooltip source={sources?.adresse ?? sources?.ville}>
-                <span className="text-sm">{address}</span>
-              </WithSourceTooltip>
+              <span className="text-sm">{address}</span>
             </Block>
           )}
 
-          {secteur && (
-            <Block label="Secteur">
-              <WithSourceTooltip
-                source={sources?.secteur ?? sources?.naf_label}
-              >
-                <span className="text-sm">{secteur}</span>
-              </WithSourceTooltip>
-            </Block>
-          )}
-
-          {taille && (
-            <Block label="Taille">
-              <WithSourceTooltip
-                source={sources?.effectif ?? sources?.taille}
-              >
-                <span className="text-sm">{taille}</span>
-              </WithSourceTooltip>
-            </Block>
-          )}
-
-          {/* Contact info --------------------------------------------- */}
           {candidate.siteWeb && (
             <Block label="Site web">
               <a
@@ -131,9 +159,7 @@ export function CandidateSheet({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-sm text-foreground hover:underline"
               >
-                <WithSourceTooltip source={sources?.site_web}>
-                  {stripScheme(candidate.siteWeb)}
-                </WithSourceTooltip>
+                {stripScheme(candidate.siteWeb)}
                 <ExternalLink className="size-3 text-muted-foreground" />
               </a>
             </Block>
@@ -148,27 +174,9 @@ export function CandidateSheet({
                 className="inline-flex items-center gap-1 text-sm text-foreground hover:underline"
               >
                 <MapIcon className="size-3.5 text-muted-foreground" />
-                <WithSourceTooltip source={sources?.google_maps_url}>
-                  Ouvrir dans Google Maps
-                </WithSourceTooltip>
+                Ouvrir dans Google Maps
                 <ExternalLink className="size-3 text-muted-foreground" />
               </a>
-            </Block>
-          )}
-
-          {rating != null && (
-            <Block label="Avis Google">
-              <div className="inline-flex items-center gap-1.5 text-sm">
-                <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                <WithSourceTooltip source={sources?.google_rating}>
-                  <span className="font-medium">{rating.toFixed(1)}</span>
-                  {ratingCount != null && (
-                    <span className="ml-1 text-muted-foreground">
-                      ({ratingCount} avis)
-                    </span>
-                  )}
-                </WithSourceTooltip>
-              </div>
             </Block>
           )}
 
@@ -179,25 +187,22 @@ export function CandidateSheet({
                 className="inline-flex items-center gap-1 text-sm text-foreground hover:underline"
               >
                 <Phone className="size-3.5 text-muted-foreground" />
-                <WithSourceTooltip source={sources?.telephone}>
-                  {candidate.telephone}
-                </WithSourceTooltip>
+                {candidate.telephone}
               </a>
             </Block>
           )}
 
-          {/* Sélecteur contact principal ------------------------------ */}
           {candidate.contacts.length > 0 && (
             <Block
               label={
                 candidate.contacts.length > 1
-                  ? `Contact principal (${candidate.contacts.length} disponibles)`
+                  ? 'Qui contacter ?'
                   : 'Contact'
               }
             >
               {candidate.contacts.length > 1 ? (
                 <p className="mb-1 text-[11px] text-muted-foreground">
-                  Sélectionne le contact principal — il devient le prospect.
+                  Choisis la personne à suivre — elle rejoindra tes contacts.
                 </p>
               ) : null}
               <RadioGroup
@@ -215,16 +220,11 @@ export function CandidateSheet({
                         : 'border-border hover:bg-muted/40',
                     )}
                   >
-                    <RadioGroupItem
-                      value={String(i)}
-                      className="mt-0.5"
-                    />
+                    <RadioGroupItem value={String(i)} className="mt-0.5" />
                     <div className="min-w-0 flex-1">
-                      <WithSourceTooltip source={c.source}>
-                        <span className="text-sm font-medium">
-                          {c.nom || 'Sans nom'}
-                        </span>
-                      </WithSourceTooltip>
+                      <span className="text-sm font-medium">
+                        {c.nom || 'Sans nom'}
+                      </span>
                       {c.role && (
                         <div className="text-[11px] text-muted-foreground">
                           {c.role}
@@ -236,34 +236,13 @@ export function CandidateSheet({
               </RadioGroup>
             </Block>
           )}
-
-          {/* Sources --------------------------------------------------- */}
-          {candidate.sources && candidate.sources.length > 0 && (
-            <Block label="Sources">
-              <ul className="flex flex-col gap-1">
-                {candidate.sources.map((s, i) => (
-                  <li key={i}>
-                    <a
-                      href={s.uri}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-start gap-1.5 text-sm text-foreground hover:underline"
-                    >
-                      <ExternalLink className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
-                      <span className="break-all">{s.title || s.uri}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </Block>
-          )}
         </div>
 
         <SheetFooter className="flex-col gap-2 border-t px-4 py-3 sm:flex-row">
           {locked && (
             <div className="flex w-full items-center gap-2 rounded-md bg-primary/[0.04] px-3 py-2 text-[12px] text-primary">
               <Loader2 className="size-3.5 animate-spin" />
-              Enrichissement en cours — actions disponibles à la fin du run.
+              Je complète encore les infos — quelques secondes…
             </div>
           )}
           <div className="flex w-full flex-row gap-2">
@@ -273,19 +252,19 @@ export function CandidateSheet({
               disabled={busy || isDone || locked}
               className="flex-1 gap-2"
             >
-              <X className="size-4" /> Refuser
+              <X className="size-4" /> Non merci
             </Button>
             <Button
               onClick={onValidate}
               disabled={busy || isDone || locked}
-              className="flex-1 gap-2"
+              className="flex-1 gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
             >
               {busy ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Check className="size-4" />
               )}
-              Valider
+              Ajouter à mes contacts
             </Button>
           </div>
         </SheetFooter>

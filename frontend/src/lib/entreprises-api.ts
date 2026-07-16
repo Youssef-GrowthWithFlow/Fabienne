@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
-import type { EntrepriseRecord, GenerateResponse } from '@/lib/entreprises'
+import type { EntrepriseRecord } from '@/lib/entreprises'
 
 export const listEntreprises = (segmentId?: string) =>
   apiGet<EntrepriseRecord[]>('/entreprises', {
@@ -23,9 +23,3 @@ export const deleteEntreprise = (id: string) =>
 
 export const regenerateEntrepriseFiche = (id: string) =>
   apiPost<EntrepriseRecord>(`/entreprises/${id}/regenerate-fiche`)
-
-export const generateEntreprises = (payload: {
-  segmentId: string | null
-  count: number
-  instruction: string
-}) => apiPost<GenerateResponse>('/entreprises/generate', payload)

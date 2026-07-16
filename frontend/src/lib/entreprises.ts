@@ -26,9 +26,7 @@ export type EntrepriseRecord = {
   codePostal: string
   ville: string
   taille: string
-  ca: string
   linkedin: string
-  score: string
   origine: string
   signaux: string[]
   note: string
@@ -100,10 +98,4 @@ export type ProposedEntreprise = {
   latitude?: number | null
   longitude?: number | null
   fieldSources?: Record<string, FieldSource>
-}
-
-export type GenerateResponse = {
-  candidates: ProposedEntreprise[]
-  searchQueries: string[]
-  grounding: GroundingRef[]
 }

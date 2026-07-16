@@ -25,7 +25,8 @@ export function Segments() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Tes segments</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          À qui tu parles, et comment. Une fiche par type de client à viser.
+          Une fiche par type de client à viser — c'est ce qui nourrit la
+          recherche de prospects.
         </p>
       </div>
 

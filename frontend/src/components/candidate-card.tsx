@@ -1,30 +1,51 @@
 import { Check, Loader2, X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { SourcerCandidate } from '@/hooks/use-sourcer-history'
 
 type Props = {
   candidate: SourcerCandidate
   onOpen: () => void
+  /** Quick actions shown on pending cards — the same as in the detail sheet. */
+  onValidate?: () => void
+  onRefuse?: () => void
+  busy?: boolean
 }
 
 const MAX_SIGNAUX_INLINE = 3
 
-export function CandidateCard({ candidate, onOpen }: Props) {
+export function CandidateCard({
+  candidate,
+  onOpen,
+  onValidate,
+  onRefuse,
+  busy,
+}: Props) {
   const main = candidate.contacts[candidate.mainContactIndex]
   const signaux = candidate.signaux ?? []
   const visibleSignaux = signaux.slice(0, MAX_SIGNAUX_INLINE)
   const extraSignaux = signaux.length - visibleSignaux.length
   const status = candidate.status
   const enriching = candidate.enriching
+  const locked = enriching || candidate.persisted === false
+  const showActions =
+    status === 'pending' && (onValidate || onRefuse) && !locked
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
       className={cn(
-        'group flex w-full flex-col gap-1.5 rounded-lg border bg-card px-4 py-3 text-left transition-colors',
+        'group flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border bg-card px-4 py-3 text-left transition-colors',
         'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         status === 'validated' && 'border-emerald-200/60 bg-emerald-50/30',
         status === 'refused' && 'opacity-50',
@@ -67,7 +88,44 @@ export function CandidateCard({ candidate, onOpen }: Props) {
           )}
         </div>
       )}
-    </button>
+
+      {showActions ? (
+        <div className="mt-1.5 flex items-center gap-2">
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={(e) => {
+              e.stopPropagation()
+              onValidate?.()
+            }}
+            className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            {busy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Check className="size-3.5" />
+            )}
+            Ajouter à mes contacts
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={(e) => {
+              e.stopPropagation()
+              onRefuse?.()
+            }}
+            className="text-muted-foreground gap-1.5"
+          >
+            <X className="size-3.5" />
+            Non merci
+          </Button>
+          <span className="text-muted-foreground ml-auto text-[11px] max-sm:hidden">
+            Clique la carte pour tout voir
+          </span>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -96,10 +154,10 @@ function EnrichingPill() {
   return (
     <Badge
       variant="outline"
-      className="shrink-0 gap-1 border-primary/30 px-1.5 text-[10px] font-normal text-primary"
+      className="shrink-0 gap-1 border-violet-300 px-1.5 text-[10px] font-normal text-violet-600 dark:border-violet-800 dark:text-violet-300"
     >
       <Loader2 className="size-2.5 animate-spin" />
-      Enrichissement
+      Je complète…
     </Badge>
   )
 }

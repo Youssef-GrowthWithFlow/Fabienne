@@ -20,7 +20,7 @@ export function CreateSegmentDialog({ open, onOpenChange, onCreate }: Props) {
       open={open}
       onOpenChange={onOpenChange}
       title="Nouveau segment"
-      description="Donnez un nom et une courte description pour démarrer. Vous pourrez compléter le brief ensuite."
+      description="Un nom et une phrase suffisent pour démarrer — tu complètes le reste juste après."
       submitLabel="Créer le segment"
       submittingLabel="Création…"
       canSubmit={nom.trim().length > 0}
