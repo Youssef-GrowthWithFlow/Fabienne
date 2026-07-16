@@ -34,6 +34,9 @@ class Prospect(Base):
     created_at: Mapped[date] = mapped_column(Date, nullable=False)
     contacted_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     relance_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # What to do at the next follow-up, in the user's words
+    # (« envoyer ma proposition de projet »). Shown as the task sentence.
+    relance_note: Mapped[str] = mapped_column(String, nullable=False, default="")
 
     entreprise: Mapped[Entreprise | None] = relationship(
         Entreprise,

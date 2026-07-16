@@ -26,7 +26,7 @@ from app.models.finess import FinessEtablissement
 from app.models.sourced_candidate import SourcedCandidate
 from app.schemas.entreprise import (
     DirigeantSchema,
-    GenerateEntreprisesResponse,
+    SourcingResult,
     GroundingRef,
     ProposedContact,
     ProposedEntreprise,
@@ -247,12 +247,11 @@ _EXCLUDE_PROMPT_LIMIT = 30
 async def _load_existing_index(
     db: AsyncSession,
 ) -> tuple[set[str], set[str]]:
-    """Return (sirets, normalized_names) of leads to NEVER re-propose.
+    """Return (sirets, normalized_names) of prospects to NEVER re-propose.
 
-    Validated entreprises (the real Entreprise table) + refused candidates.
-    Pending candidates are excluded from the index intentionally: they
-    haven't been acted on yet, and keeping them in the exclude list shrinks
-    each new run to almost nothing once the history grows.
+    Validated entreprises (the real Entreprise table) + refused candidates
+    + pending candidates. Pending ones are already sitting in « À regarder » —
+    re-proposing them in a new run only produces confusing duplicates.
     """
     sirets: set[str] = set()
     names: set[str] = set()
@@ -269,7 +268,7 @@ async def _load_existing_index(
 
     sc_rows = await db.execute(
         select(SourcedCandidate.payload).where(
-            SourcedCandidate.status == "refused"
+            SourcedCandidate.status.in_(["refused", "pending"])
         )
     )
     for (payload,) in sc_rows.all():
@@ -582,7 +581,7 @@ async def generate_entreprises(
     instruction: str,
     count: int,
     progress: ProgressFn = _noop_progress,
-) -> GenerateEntreprisesResponse:
+) -> SourcingResult:
     """Call Gemini with Google Search grounding + structured output.
 
     When `segment.data_sources` contains `'finess'`, a deterministic shortlist
@@ -601,7 +600,7 @@ async def generate_entreprises(
 
     await progress({
         "phase": "loading_history",
-        "message": "Chargement de l'historique des entreprises…",
+        "message": "Je regarde ce que tu as déjà…",
     })
     existing_sirets, existing_names = await _load_existing_index(db)
     exclude_section = _format_exclude_block(existing_names)
@@ -614,7 +613,7 @@ async def generate_entreprises(
     if finess_enabled:
         await progress({
             "phase": "finess_shortlist",
-            "message": "Lecture du référentiel FINESS…",
+            "message": "Je consulte l'annuaire officiel des établissements…",
         })
         finess_records = await _finess_shortlist(db, segment, instruction)
         finess_section = _format_finess_block(finess_records)
@@ -651,7 +650,7 @@ async def generate_entreprises(
 
     await progress({
         "phase": "gemini_sourcing",
-        "message": "Recherche IA — Gemini + Google Search…",
+        "message": "Je cherche les bons établissements…",
         "detail": f"Cible : {target_count} candidat(s)",
     })
 
@@ -719,10 +718,7 @@ async def generate_entreprises(
         total = len(candidates)
         await progress({
             "phase": "enriching",
-            "message": (
-                f"Enrichissement de {total} candidat(s) "
-                "(api_gouv, Google Places, Ordre, Gemini)…"
-            ),
+            "message": f"Je complète les infos (0/{total})…",
             "current": 0,
             "total": total,
         })
@@ -802,14 +798,14 @@ async def generate_entreprises(
     await progress({
         "phase": "done",
         "message": (
-            f"{len(candidates)} candidat(s) prêt(s)"
+            f"J'ai trouvé {len(candidates)} piste(s) pour toi !"
             if candidates
-            else "Aucun candidat trouvé."
+            else "Je n'ai rien trouvé cette fois — réessaie en précisant ta demande."
         ),
         "count": len(candidates),
     })
 
-    return GenerateEntreprisesResponse(
+    return SourcingResult(
         candidates=candidates,
         search_queries=queries,
         grounding=[GroundingRef(title=s.title, uri=s.uri) for s in sources[:8]],

@@ -14,10 +14,6 @@ class Settings(BaseSettings):
     # Sourcing needs grounding_chunks in the response. The flash-lite tier
     # strips them; flash (non-lite) returns them.
     GEMINI_SOURCING_MODEL: str = "gemini-3.5-flash"
-    # Conversational chat agent (function calling). Uses the preview variant
-    # of Gemini 3.1 Flash — more reliable on tool calls than flash-lite.
-    # If empty, falls back to GEMINI_MODEL.
-    GEMINI_CHAT_MODEL: str = "gemini-3.1-flash-lite-preview"
 
     # API gouv (recherche-entreprises.api.gouv.fr) — public, no auth.
     API_GOUV_BASE_URL: str = "https://recherche-entreprises.api.gouv.fr"

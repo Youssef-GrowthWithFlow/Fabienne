@@ -13,11 +13,11 @@ from app.schemas.entreprise import (
     EntrepriseCreate,
     EntrepriseRead,
     EntrepriseUpdate,
-    GenerateEntreprisesRequest,
-    GenerateEntreprisesResponse,
 )
-from app.services.enrichment import build_entreprise_fiche
-from app.services.sourcer import generate_entreprises
+from app.services.enrichment import (
+    build_entreprise_fiche,
+    complete_entreprise_fields,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/entreprises", tags=["entreprises"])
@@ -105,30 +105,6 @@ async def delete_entreprise(
 
 
 @router.post(
-    "/generate",
-    response_model=GenerateEntreprisesResponse,
-    response_model_by_alias=True,
-)
-async def generate_endpoint(
-    payload: GenerateEntreprisesRequest,
-    db: AsyncSession = Depends(get_db),
-) -> GenerateEntreprisesResponse:
-    segment = None
-    if payload.segment_id:
-        segment = await db.get(Segment, payload.segment_id)
-        if segment is None:
-            raise HTTPException(status_code=404, detail="Segment not found")
-    try:
-        return await generate_entreprises(
-            db, segment, payload.instruction, payload.count
-        )
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
-        ) from exc
-
-
-@router.post(
     "/{entreprise_id}/regenerate-fiche",
     response_model=EntrepriseRead,
     response_model_by_alias=True,
@@ -143,6 +119,15 @@ async def regenerate_fiche_endpoint(
         if entreprise.segment_id
         else None
     )
+    # Fill the empty fields (site web, téléphone, adresse, SIRET, dirigeants…)
+    # BEFORE the fiche call so the fiche prompt benefits from them too.
+    # Committed on its own: the fields must survive even if the fiche fails.
+    try:
+        if await complete_entreprise_fields(entreprise):
+            await db.commit()
+            await db.refresh(entreprise)
+    except Exception:  # noqa: BLE001 — enrichment is best-effort
+        logger.exception("Field completion failed for %r", entreprise_id)
     try:
         html, _sources, _queries = await build_entreprise_fiche(entreprise, segment)
     except RuntimeError as exc:

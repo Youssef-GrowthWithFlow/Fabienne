@@ -22,10 +22,13 @@ class ProspectBase(BaseModel):
     created_at: date = Field(alias="createdAt")
     contacted_at: date | None = Field(default=None, alias="contactedAt")
     relance_date: date | None = Field(default=None, alias="relanceDate")
+    relance_note: str = Field(default="", alias="relanceNote")
 
 
 class ProspectCreate(ProspectBase):
-    pass
+    # Free-text company name: the API finds or creates the matching
+    # Entreprise when no entreprise_id is provided.
+    entreprise_nom: str = Field(default="", alias="entrepriseNom")
 
 
 class ProspectUpdate(ProspectBase):

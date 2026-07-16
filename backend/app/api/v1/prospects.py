@@ -1,11 +1,12 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1._helpers import get_or_404
 from app.core.database import get_db
+from app.models.entreprise import Entreprise
 from app.models.prospect import Prospect
 from app.schemas.prospect import ProspectCreate, ProspectRead, ProspectUpdate
 from app.services.actions import KIND_TO_STATUS, log_action
@@ -40,6 +41,22 @@ async def create_prospect(
     payload: ProspectCreate, db: AsyncSession = Depends(get_db)
 ) -> Prospect:
     data = _payload_to_db(payload.model_dump(by_alias=False))
+    entreprise_nom = data.pop("entreprise_nom", "").strip()
+    if not data.get("entreprise_id") and entreprise_nom:
+        existing = await db.scalar(
+            select(Entreprise)
+            .where(func.lower(Entreprise.entreprise) == entreprise_nom.lower())
+            .limit(1)
+        )
+        ent = existing or Entreprise(
+            entreprise=entreprise_nom,
+            origine="Manuel",
+            field_sources={"entreprise": "manual"},
+        )
+        if existing is None:
+            db.add(ent)
+            await db.flush()
+        data["entreprise_id"] = ent.id
     obj = Prospect(**data)
     db.add(obj)
     await db.flush()

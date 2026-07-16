@@ -10,6 +10,7 @@ brief formatting) lives in `app.services.gemini`.
 from __future__ import annotations
 
 import html as html_lib
+import json
 import logging
 import re
 from urllib.parse import urlparse
@@ -64,10 +65,11 @@ ordre, **pas de h3**) :
   <li>3 à 6 puces datées et sourcées. Privilégie les 12-24 derniers mois : levées de fonds (montant + date + investisseur), reprises / changements de capital, recrutements actifs (postes + volume), transferts / ouvertures de site, partenariats nouveaux, certifications obtenues, prix ou distinctions, contrats publics gagnés. Chaque puce = un fait vérifiable + sa source publique (Pappers, Maddyness, JOUE, registre, presse locale, site officiel…).</li>
 </ul>
 
-<h2>Décideurs</h2>
+<h2>Décideurs & contacts</h2>
 <ul>
-  <li>Si tu identifies des dirigeants / décideurs nommés publiquement : 1 puce par personne, format « <strong>Prénom Nom</strong> — rôle (ex. Président, DAF, Directeur des opérations) ». Cite la source en fin de puce (Pappers, LinkedIn officiel de l'entreprise, communiqué).</li>
-  <li>Si aucun décideur n'est trouvable, écris une seule puce : « Profil-type à viser : <em>[rôle adapté au segment]</em> (aucun dirigeant nommé identifié publiquement). »</li>
+  <li>Si tu identifies des dirigeants / décideurs nommés publiquement : 1 puce par personne, format « <strong>Prénom Nom</strong> — rôle (ex. Président, DAF, Directeur des opérations) », suivie de **tout canal de contact public trouvé pour cette personne** : email professionnel, ligne directe, profil LinkedIn (URL). Cite la source en fin de puce (Pappers, LinkedIn officiel de l'entreprise, communiqué). N'invente JAMAIS une coordonnée — uniquement ce que la recherche a réellement retourné.</li>
+  <li>Termine par une puce « <strong>Joindre l'entreprise</strong> » avec les canaux génériques publics trouvés : téléphone standard, email d'accueil/contact, formulaire de contact (URL), page LinkedIn de l'entreprise, horaires d'ouverture si publiés. Le but : que le lecteur ait TOUT ce qu'il faut pour contacter l'entreprise sans chercher ailleurs.</li>
+  <li>Si aucun décideur n'est trouvable, écris une puce : « Profil-type à viser : <em>[rôle adapté au segment]</em> (aucun dirigeant nommé identifié publiquement). » — puis quand même la puce « Joindre l'entreprise » ci-dessus.</li>
 </ul>
 
 <h2>Angle commercial</h2>
@@ -95,8 +97,6 @@ def _format_entreprise_signaux(entreprise) -> str:
     signaux = getattr(entreprise, "signaux", None) or []
     if signaux:
         parts.append("Signaux: " + ", ".join(str(s) for s in signaux if s))
-    if getattr(entreprise, "score", ""):
-        parts.append(f"Score: {entreprise.score}")
     if getattr(entreprise, "note", ""):
         parts.append(f"Note précédente: {entreprise.note}")
     return "\n".join(parts) if parts else "(aucun signal pré-détecté)"
@@ -145,6 +145,79 @@ def _build_fiche_message_from_entreprise(
 
 
 _HTML_FENCE = re.compile(r"^\s*```(?:html)?\s*|\s*```\s*$", re.IGNORECASE)
+
+# A grounded segment that spans block-level tags can't be wrapped in a <span>
+# without producing broken markup — those are skipped.
+_BLOCK_TAG_RE = re.compile(rb"</?(?:h[1-6]|ul|ol|li|p|div)[\s>]", re.IGNORECASE)
+
+
+def _annotate_html_with_sources(raw: str, response) -> str:
+    """Wrap grounded text segments in ``<span class="grounded" data-sources>``.
+
+    Gemini's ``grounding_supports`` maps byte ranges of the response text to
+    the grounding chunks (real URLs) that back them. The UI uses the spans to
+    show, on hover, exactly which sources a sentence came from. Fiches without
+    supports come out unchanged.
+    """
+    candidates = getattr(response, "candidates", None) or []
+    if not candidates:
+        return raw
+    meta = getattr(candidates[0], "grounding_metadata", None)
+    supports = getattr(meta, "grounding_supports", None) or []
+    chunks = getattr(meta, "grounding_chunks", None) or []
+    if not supports or not chunks:
+        return raw
+
+    def chunk_ref(i: int) -> dict | None:
+        if i < 0 or i >= len(chunks):
+            return None
+        web = getattr(chunks[i], "web", None)
+        if web is None:
+            return None
+        uri = getattr(web, "uri", "") or ""
+        if not uri:
+            return None
+        title = (
+            getattr(web, "title", "") or getattr(web, "domain", "") or ""
+        )
+        return {"uri": uri, "title": title}
+
+    spans: list[tuple[int, int, list[dict]]] = []
+    for s in supports:
+        seg = getattr(s, "segment", None)
+        if seg is None:
+            continue
+        start = getattr(seg, "start_index", None) or 0
+        end = getattr(seg, "end_index", None)
+        idxs = getattr(s, "grounding_chunk_indices", None) or []
+        refs = [r for r in (chunk_ref(i) for i in idxs) if r]
+        if end is None or end <= start or not refs:
+            continue
+        spans.append((int(start), int(end), refs))
+
+    # Offsets are byte positions in the UTF-8 text; rewrite from the end so
+    # earlier offsets stay valid, skipping overlaps and block-crossing spans.
+    data = raw.encode("utf-8")
+    spans.sort(key=lambda t: t[0], reverse=True)
+    last_start = len(data) + 1
+    for start, end, refs in spans:
+        if end > last_start or end > len(data):
+            continue
+        seg_bytes = data[start:end]
+        if _BLOCK_TAG_RE.search(seg_bytes):
+            continue
+        payload = html_lib.escape(
+            json.dumps(refs, ensure_ascii=False), quote=True
+        ).encode("utf-8")
+        data = (
+            data[:start]
+            + b'<span class="grounded" data-sources="' + payload + b'">'
+            + seg_bytes
+            + b"</span>"
+            + data[end:]
+        )
+        last_start = start
+    return data.decode("utf-8", errors="ignore")
 
 
 def _clean_fiche_html(raw: str) -> str:
@@ -211,14 +284,20 @@ async def _generate_fiche_html(
         system_instruction=FICHE_SYSTEM_INSTRUCTION,
         temperature=0.3,
         tools=[types.Tool(google_search=types.GoogleSearch())],
-        # Gemini 3.x: medium deliberation is enough to trigger 3-6 Google
-        # searches and produce a grounded fiche. (legacy: thinking_budget=-1)
-        thinking_config=types.ThinkingConfig(thinking_level="medium"),
+        # Gemini 3.x: "medium" empirically skips google_search on a regular
+        # basis (same behaviour documented for the sourcer), which makes the
+        # whole call fail with "aucune recherche effectuée". "high" forces the
+        # deliberation that reliably triggers the searches.
+        thinking_config=types.ThinkingConfig(thinking_level="high"),
     )
 
     async def _call(msg: str):
+        # The flash-lite tier strips grounding_chunks/supports from responses
+        # (documented in core/config.py) — the fiche needs them both to prove
+        # its facts and to power the per-sentence clickable sources. Use the
+        # same non-lite model as the sourcer.
         return await client.aio.models.generate_content(
-            model=settings.GEMINI_MODEL,
+            model=settings.GEMINI_SOURCING_MODEL,
             contents=msg,
             config=config,
         )
@@ -239,11 +318,103 @@ async def _generate_fiche_html(
             )
 
     raw = getattr(response, "text", "") or ""
+    raw = _annotate_html_with_sources(raw, response)
     html = _clean_fiche_html(raw)
     sources_html = _format_sources_section(sources, queries)
     if html and sources_html:
         html = html.rstrip() + "\n\n" + sources_html
     return html, sources, queries
+
+
+async def complete_entreprise_fields(entreprise) -> bool:
+    """Fill the entreprise's EMPTY fields from api.gouv + Google Places.
+
+    Called alongside fiche generation so a manually-created entreprise gets
+    its site web, téléphone, adresse, SIRET, dirigeants… without the user
+    typing anything. Never overwrites a non-empty value. Returns True when
+    at least one field was written.
+    """
+    from app.services import api_entreprise, google_places
+
+    name = (entreprise.entreprise or "").strip()
+    if not name:
+        return False
+
+    # api.gouv first: authoritative, France-only, and it may recover the
+    # ville/adresse that anchor the Google Places lookup.
+    try:
+        gouv = await api_entreprise.enrich(
+            name,
+            ville=entreprise.ville or None,
+            code_postal=entreprise.code_postal or None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("complete_fields: api_gouv failed: %s", exc)
+        gouv = None
+
+    ville = entreprise.ville or (gouv.ville if gouv else "") or ""
+    code_postal = (
+        entreprise.code_postal or (gouv.code_postal if gouv else "") or ""
+    )
+    adresse = entreprise.adresse or (gouv.adresse if gouv else "") or ""
+
+    # Without any location anchor, a worldwide Places text search happily
+    # returns a homonym on another continent — skip it in that case.
+    places = None
+    if ville or code_postal or adresse:
+        try:
+            places = await google_places.enrich(
+                name, ville=ville, code_postal=code_postal, adresse=adresse
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("complete_fields: google_places failed: %s", exc)
+
+    changed = False
+    sources = dict(entreprise.field_sources or {})
+
+    def fill(field: str, value, source: str) -> None:
+        nonlocal changed
+        if value in (None, "", []):
+            return
+        if getattr(entreprise, field, None) in (None, "", []):
+            setattr(entreprise, field, value)
+            sources[field] = source
+            changed = True
+
+    if gouv is not None:
+        fill("siren", gouv.siren, "api_gouv")
+        fill("siret", gouv.siret, "api_gouv")
+        fill("naf_code", gouv.naf_code, "api_gouv")
+        fill("naf_label", gouv.naf_label, "api_gouv")
+        fill("effectif", gouv.effectif, "api_gouv")
+        fill("date_creation", gouv.date_creation, "api_gouv")
+        fill("adresse", gouv.adresse, "api_gouv")
+        fill("code_postal", gouv.code_postal, "api_gouv")
+        fill("ville", gouv.ville, "api_gouv")
+        if gouv.dirigeants and not entreprise.dirigeants:
+            entreprise.dirigeants = [
+                {"nom": d.nom, "qualite": d.qualite} for d in gouv.dirigeants
+            ]
+            sources["dirigeants"] = "api_gouv"
+            changed = True
+
+    if places is not None:
+        fill("site_web", places.site_web, "google_places")
+        fill("telephone", places.telephone, "google_places")
+        fill("adresse", places.adresse, "google_places")
+        fill("google_place_id", places.place_id, "google_places")
+        fill("google_maps_url", places.google_maps_url, "google_places")
+        fill("latitude", places.latitude, "google_places")
+        fill("longitude", places.longitude, "google_places")
+        if places.rating is not None and entreprise.google_rating is None:
+            entreprise.google_rating = places.rating
+            entreprise.google_rating_count = places.rating_count
+            sources["google_rating"] = "google_places"
+            changed = True
+
+    if changed:
+        entreprise.field_sources = sources
+    return changed
 
 
 async def build_entreprise_fiche(

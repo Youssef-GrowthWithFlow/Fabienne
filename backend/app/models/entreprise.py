@@ -29,9 +29,7 @@ class Entreprise(Base):
     code_postal: Mapped[str] = mapped_column(String, nullable=False, default="")
     ville: Mapped[str] = mapped_column(String, nullable=False, default="")
     taille: Mapped[str] = mapped_column(String, nullable=False, default="")
-    ca: Mapped[str] = mapped_column(String, nullable=False, default="")
     linkedin: Mapped[str] = mapped_column(String, nullable=False, default="")
-    score: Mapped[str] = mapped_column(String, nullable=False, default="")
     origine: Mapped[str] = mapped_column(String, nullable=False, default="")
 
     # Flat list of short tags (max ~4 words each) — the same shape produced

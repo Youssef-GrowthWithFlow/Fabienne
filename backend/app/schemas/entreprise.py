@@ -26,9 +26,7 @@ class EntrepriseBase(BaseModel):
     code_postal: str = Field(default="", alias="codePostal")
     ville: str = ""
     taille: str = ""
-    ca: str = ""
     linkedin: str = ""
-    score: str = ""
     origine: str = ""
     signaux: list[str] = Field(default_factory=list)
     note: str = ""
@@ -73,9 +71,7 @@ class EntrepriseUpdate(BaseModel):
     code_postal: str | None = Field(default=None, alias="codePostal")
     ville: str | None = None
     taille: str | None = None
-    ca: str | None = None
     linkedin: str | None = None
-    score: str | None = None
     origine: str | None = None
     signaux: list[str] | None = None
     note: str | None = None
@@ -181,15 +177,10 @@ class ProposedEntreprise(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class GenerateEntreprisesRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    segment_id: str | None = Field(default=None, alias="segmentId")
-    count: int = Field(default=3, ge=1, le=10)
-    instruction: str = ""
+class SourcingResult(BaseModel):
+    """Return type of ``generate_entreprises`` (internal sourcing pipeline)."""
 
 
-class GenerateEntreprisesResponse(BaseModel):
     candidates: list[ProposedEntreprise] = Field(default_factory=list)
     search_queries: list[str] = Field(
         default_factory=list, serialization_alias="searchQueries"
