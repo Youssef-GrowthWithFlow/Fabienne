@@ -1,8 +1,15 @@
 import { CalendarClock, Check, Mail, Phone, Send } from 'lucide-react'
-import { useRef } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { useProspects } from '@/hooks/use-prospects'
 import {
   formatDate,
@@ -45,7 +53,8 @@ export function RelanceRow({
   onDone: () => void
 }) {
   const { updateProspect } = useProspects()
-  const dateInputRef = useRef<HTMLInputElement>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickedDate, setPickedDate] = useState('')
   const sentence = taskSentence(prospect)
   const hasChannel = !!(prospect.email || prospect.telephone || prospect.linkedin)
 
@@ -186,26 +195,46 @@ export function RelanceRow({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
-                const input = dateInputRef.current
-                if (!input) return
-                if (typeof input.showPicker === 'function') input.showPicker()
-                else input.click()
+                setPickedDate(isoInDays(1))
+                setPickerOpen(true)
               }}
             >
               Choisir une date…
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Sélecteur natif invisible, ouvert par « Choisir une date… ». */}
-        <input
-          ref={dateInputRef}
-          type="date"
-          min={todayIso()}
-          tabIndex={-1}
-          aria-hidden
-          onChange={(e) => postponeTo(e.target.value)}
-          className="pointer-events-none absolute size-0 opacity-0"
-        />
+
+        {/* Petite modale centrée — le sélecteur natif sur input caché
+            s'ouvrait à une position imprévisible. */}
+        <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+          <DialogContent className="max-w-xs">
+            <DialogHeader>
+              <DialogTitle>Remettre à quand ?</DialogTitle>
+            </DialogHeader>
+            <Input
+              type="date"
+              value={pickedDate}
+              min={todayIso()}
+              onChange={(e) => setPickedDate(e.target.value)}
+              className="w-full"
+              aria-label="Nouvelle date de relance"
+            />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setPickerOpen(false)}>
+                Annuler
+              </Button>
+              <Button
+                disabled={!pickedDate}
+                onClick={() => {
+                  setPickerOpen(false)
+                  postponeTo(pickedDate)
+                }}
+              >
+                C'est noté
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
