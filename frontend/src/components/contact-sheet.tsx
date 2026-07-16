@@ -749,6 +749,14 @@ export function ContactSheet({
   // While the personal-info lookup (web + DropContact) runs in background,
   // poll the prospect so email / téléphone / LinkedIn land on their own.
   const enriching = prospect.enrichmentStatus === 'generating'
+  // Lookup finished (or failed — jamais de détail technique pour Fabienne)
+  // without finding any channel: say so gently instead of staying silent.
+  const enrichmentDoneEmpty =
+    (prospect.enrichmentStatus === 'ready' ||
+      prospect.enrichmentStatus === 'error') &&
+    !prospect.email &&
+    !prospect.telephone &&
+    !prospect.linkedin
   useEffect(() => {
     if (!enriching) return
     const id = window.setInterval(async () => {
@@ -888,6 +896,11 @@ export function ContactSheet({
                   <Loader2 className="size-3.5 shrink-0 animate-spin" />
                   Je cherche ses coordonnées — email, téléphone direct,
                   LinkedIn. Elles apparaîtront ici toutes seules.
+                </div>
+              ) : enrichmentDoneEmpty ? (
+                <div className="bg-muted/40 text-muted-foreground rounded-md px-3 py-2 text-xs">
+                  Je n'ai pas réussi à trouver ses coordonnées — si tu les as,
+                  ajoute-les ci-dessous.
                 </div>
               ) : null}
               <div className="flex gap-2">
