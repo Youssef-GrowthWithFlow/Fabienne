@@ -367,14 +367,18 @@ async def _enrich_after_validate(
     contact_nom: str,
     contact_role: str,
 ) -> None:
-    """Background enrichment: fiche (Gemini) + coordonnées + DropContact.
+    """Background enrichment: fiche (Gemini) + coordonnées, DropContact en filet.
 
     Opens its own DB session — the request-scoped session is gone by the
-    time this runs. Fiche and DropContact run in parallel; each soft-fails
-    without crashing the other. Personal channels found ONLINE (in the
-    grounded fiche) land first; DropContact fills the gaps and, being
-    verified, its nominative email wins over an AI-grounded one. Generic
-    channels (contact@, standard) go to the Entreprise, never the Prospect.
+    time this runs. Sequence:
+
+    1. Grounded fiche (Gemini + google_search) → committed as soon as ready.
+    2. Structured extraction of the channels found ONLINE in the fiche —
+       personal ones → prospect, generic ones (contact@, standard) →
+       entreprise.
+    3. DropContact ONLY if the AI sourcing found no personal channel at all
+       (no email, no phone, no LinkedIn) — it costs credits, so it stays a
+       fallback, never a systematic call.
 
     Lifecycle statuses (entreprise.fiche_status / prospect.enrichment_status)
     are kept up to date so the frontend can show live loaders.
@@ -397,49 +401,26 @@ async def _enrich_after_validate(
                 await bg_db.get(Segment, segment_id) if segment_id else None
             )
 
-            fiche_task = asyncio.ensure_future(
-                build_entreprise_fiche(
+            html = ""
+            try:
+                html, _sources, _queries = await build_entreprise_fiche(
                     entreprise,
                     segment,
                     contact_nom=contact_nom,
                     contact_role=contact_role,
                 )
-            )
-            dc_task: asyncio.Future | None = None
-            if prospect is not None and contact_nom:
-                dc_task = asyncio.ensure_future(
-                    dropcontact.enrich(
-                        nom=contact_nom,
-                        entreprise=entreprise.entreprise,
-                        website=entreprise.site_web or "",
-                        linkedin=prospect.linkedin or "",
-                    )
-                )
-
-            tasks: list[asyncio.Future] = [fiche_task]
-            if dc_task is not None:
-                tasks.append(dc_task)
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            fiche_result = results[0]
-            dc_result = results[1] if dc_task is not None else None
-
-            html = ""
-            if isinstance(fiche_result, BaseException):
-                entreprise.fiche_status = "error"
+            except Exception:  # noqa: BLE001
                 logger.exception(
                     "Background fiche generation failed for entreprise %s",
-                    entreprise_id, exc_info=fiche_result,
+                    entreprise_id,
                 )
+            if html:
+                entreprise.fiche_client = html
+                entreprise.fiche_status = "ready"
             else:
-                html, _sources, _queries = fiche_result
-                if html:
-                    entreprise.fiche_client = html
-                    entreprise.fiche_status = "ready"
-                else:
-                    entreprise.fiche_status = "error"
+                entreprise.fiche_status = "error"
             # The fiche is the long pole — commit it (and its status) as soon
-            # as it lands so the polling UI stops its loader without waiting
-            # for DropContact's slow poll window.
+            # as it lands so the polling UI stops its loader right away.
             await bg_db.commit()
 
             # Channels found online, straight from the grounded fiche.
@@ -450,17 +431,33 @@ async def _enrich_after_validate(
                 if coords is not None:
                     _apply_fiche_coordonnees(prospect, entreprise, coords)
 
+            # DropContact fallback — only when the web search yielded no way
+            # to reach the person.
+            dc_called = False
             if (
                 prospect is not None
-                and dc_result is not None
-                and not isinstance(dc_result, BaseException)
+                and contact_nom
+                and not prospect.email
+                and not prospect.telephone
+                and not prospect.linkedin
             ):
-                _apply_dropcontact_to_prospect(prospect, dc_result, entreprise)
-            elif isinstance(dc_result, BaseException):
-                logger.exception(
-                    "Background DropContact enrichment failed for prospect %s",
-                    prospect_id, exc_info=dc_result,
-                )
+                dc_called = True
+                try:
+                    dc_result = await dropcontact.enrich(
+                        nom=contact_nom,
+                        entreprise=entreprise.entreprise,
+                        website=entreprise.site_web or "",
+                        linkedin="",
+                    )
+                    if dc_result is not None:
+                        _apply_dropcontact_to_prospect(
+                            prospect, dc_result, entreprise
+                        )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "Background DropContact enrichment failed for prospect %s",
+                        prospect_id,
+                    )
 
             if prospect is not None:
                 prospect.enrichment_status = "ready"
@@ -470,10 +467,7 @@ async def _enrich_after_validate(
                 "fiche=%s, dropcontact=%s)",
                 entreprise_id, prospect_id,
                 "ok" if html else "fail",
-                "ok" if (
-                    dc_task is not None
-                    and not isinstance(dc_result, BaseException)
-                ) else "skip/fail",
+                "called" if dc_called else "skipped (canaux trouvés en ligne)",
             )
         except Exception:  # noqa: BLE001
             logger.exception(
