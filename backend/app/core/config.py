@@ -45,6 +45,20 @@ class Settings(BaseSettings):
     DROPCONTACT_POLL_TIMEOUT: float = 90.0
     DROPCONTACT_POLL_INTERVAL: float = 5.0
 
+    # SMTP (transactional email — Gmail/Workspace via app password). An
+    # empty SMTP_HOST disables sending: the mailer logs the message instead
+    # of shipping it, so local dev needs no credentials.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 465
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    # Gmail rewrites this to SMTP_USER unless the address is a verified
+    # "Send mail as" alias on that account.
+    SMTP_FROM: str = "Youssef @ Growth With Flow <youssef@growthwithflow.com>"
+    # Port 465 speaks TLS from the first byte; 587 starts plain and upgrades.
+    SMTP_USE_SSL: bool = True
+    SMTP_TIMEOUT: float = 15.0
+
     # JWT auth.
     JWT_SECRET_KEY: str = "change-me-in-prod"
     JWT_ALGORITHM: str = "HS256"

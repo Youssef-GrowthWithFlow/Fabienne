@@ -1,16 +1,22 @@
 """Auth endpoints — login, me, change password, forgot/reset password.
 
-Password-reset emails are NOT sent here (no SMTP configured yet). The
-``/forgot-password`` endpoint stamps a token on the user row and logs the
-reset URL ; an operator can hand it to the user manually for now. When SMTP
-is wired up later, the same flow will send the link by email.
+``/forgot-password`` stamps a reset token on the user row and mails the link
+in a background task. With no SMTP configured the mailer logs the URL
+instead, so an operator can still hand it over by hand.
 """
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Response,
+    status,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -34,6 +40,7 @@ from app.services.auth import (
     issue_reset_token,
     verify_password,
 )
+from app.services.mailer import send_password_reset
 
 logger = logging.getLogger(__name__)
 
@@ -111,13 +118,14 @@ async def change_my_password(
 @router.post("/forgot-password", status_code=204, response_class=Response)
 async def forgot_password(
     payload: ForgotPasswordIn,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Stamp a reset token on the user row if it exists.
+    """Stamp a reset token on the user row and mail the link.
 
-    Always returns 204 (don't leak whether the email is registered). When
-    SMTP is configured later, this is where the email is sent. For now,
-    the reset URL is logged at INFO level so an operator can retrieve it.
+    Always returns 204 (don't leak whether the email is registered). The mail
+    goes out in a background task so SMTP latency doesn't leak the answer
+    through the response time either.
     """
     user = (
         await db.execute(select(User).where(User.email == payload.email.lower()))
@@ -128,7 +136,7 @@ async def forgot_password(
         reset_url = (
             f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
         )
-        logger.info("Password reset requested for %s → %s", user.email, reset_url)
+        background.add_task(send_password_reset, to=user.email, reset_url=reset_url)
     return Response(status_code=204)
 
 
